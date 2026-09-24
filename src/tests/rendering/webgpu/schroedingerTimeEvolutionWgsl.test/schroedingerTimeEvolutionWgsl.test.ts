@@ -30,13 +30,16 @@ describe('Schroedinger time evolution WGSL composition', () => {
 
   it('produces valid WGSL for all supported dimensions with temporal enabled', () => {
     for (const dimension of [3, 4, 5, 8, 11]) {
-      const { wgsl } = composeSchroedingerShader({
+      // composeSchroedingerShader reads `temporalAccumulation`; the inherited
+      // `temporal` key is ignored, so it never enabled the temporal path.
+      const { wgsl, features } = composeSchroedingerShader({
         dimension,
         quantumMode: dimension === 3 ? 'hydrogenND' : 'harmonicOscillator',
-        temporal: true,
+        temporalAccumulation: true,
       })
 
       expect(wgsl).toBeValidWGSL('fragment')
+      expect(features).toContain('Temporal Accumulation')
     }
   })
 })

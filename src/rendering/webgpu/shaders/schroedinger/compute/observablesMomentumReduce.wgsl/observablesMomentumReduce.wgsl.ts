@@ -15,7 +15,7 @@
  *
  * Requires freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(256)
+ * @workgroup_size(128)
  * @module
  */
 
@@ -35,13 +35,14 @@ struct ObsMomReduceUniforms {
 @group(0) @binding(2) var<storage, read_write> partials: array<f32>;
 
 // Channel-major layout: sdata[ch * WG_SIZE + local]. Bank-conflict-free
-// because WG_SIZE=256 is a multiple of 32-bank width (previously:
+// because WG_SIZE=128 (12 KiB of sdata, within WebGPU's 16 KiB guaranteed
+// workgroup storage) is a multiple of 32-bank width (previously:
 // sdata[local * 24 + ch] caused 4-way bank conflicts since gcd(24,32)=8).
 const MAX_CHANNELS: u32 = 24u;
-const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;  // MAX_CHANNELS * WG_SIZE
+const WG_SIZE: u32 = 128u;
+var<workgroup> sdata: array<f32, 3072>;  // MAX_CHANNELS * WG_SIZE (12 KiB)
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(128)
 fn main(
   @builtin(global_invocation_id) gid: vec3u,
   @builtin(local_invocation_id) lid: vec3u,
@@ -85,7 +86,7 @@ fn main(
   workgroupBarrier();
 
   // Tree reduction (channel-major, bank-conflict-free).
-  for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
+  for (var stride: u32 = 64u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
         let chBase = ch * WG_SIZE;
@@ -110,7 +111,7 @@ fn main(
  * Single-workgroup reduction of partial sums from Pass 1.
  * Output: [knorm, k0_mean, k0_sq, k1_mean, k1_sq, ...]
  *
- * @workgroup_size(256)
+ * @workgroup_size(128)
  */
 export const observablesMomentumFinalizeBlock = /* wgsl */ `
 struct ObsMomReduceUniforms {
@@ -129,10 +130,10 @@ struct ObsMomReduceUniforms {
 
 // Channel-major layout — see observablesMomentumReduceBlock for rationale.
 const MAX_CHANNELS: u32 = 24u;
-const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;
+const WG_SIZE: u32 = 128u;
+var<workgroup> sdata: array<f32, 3072>;
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(128)
 fn main(
   @builtin(local_invocation_id) lid: vec3u,
 ) {
@@ -154,7 +155,7 @@ fn main(
   }
   workgroupBarrier();
 
-  for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
+  for (var stride: u32 = 64u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
         let chBase = ch * WG_SIZE;

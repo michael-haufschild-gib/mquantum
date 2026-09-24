@@ -52,6 +52,13 @@ export default defineConfig({
       // `pnpm exec vitest run src/tests/.../_<name>.test.ts`.
       '**/_*.test.ts',
     ],
+    // Benchmarks live in `<name>.bench/index.ts` folders (folder-boundary
+    // lint). Vitest's default `**/*.{bench,benchmark}.?(c|m)[jt]s?(x)` does
+    // not match that layout, so since the move `vitest bench` reported
+    // "No benchmark files found" and every perf baseline silently stopped.
+    benchmark: {
+      include: ['src/**/*.bench/index.ts', 'src/**/*.{bench,benchmark}.?(c|m)[jt]s?(x)'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov', 'json-summary'],

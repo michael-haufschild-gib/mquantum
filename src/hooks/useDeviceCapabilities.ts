@@ -59,15 +59,20 @@ export function useDeviceCapabilities(): void {
         const userHasFpsPreference = hasPersistedMaxFps()
         const perfStore = usePerformanceStore.getState()
 
+        // Constrained defaults are applied to the store only — NOT persisted.
+        // The setters persist, so routing the defaults through them saved the
+        // auto-choice as a "user preference": one conservative detection (e.g.
+        // the detection-error fallback reports tier ≤ 1) pinned a capable
+        // desktop GPU to half resolution on every later load.
         if (persistedResolutionScale !== null) {
           perfStore.setRenderResolutionScale(persistedResolutionScale)
         } else {
-          perfStore.setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
+          usePerformanceStore.setState({ renderResolutionScale: MOBILE_DEFAULT_RESOLUTION_SCALE })
         }
         if (persistedMaxFps !== null) {
           perfStore.setMaxFps(persistedMaxFps)
         } else {
-          perfStore.setMaxFps(MOBILE_DEFAULT_MAX_FPS)
+          usePerformanceStore.setState({ maxFps: MOBILE_DEFAULT_MAX_FPS })
         }
 
         // Remove spotlight on constrained devices - keep only point light for performance

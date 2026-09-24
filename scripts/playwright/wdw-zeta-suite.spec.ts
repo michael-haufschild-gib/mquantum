@@ -20,6 +20,7 @@ import {
   gotoMode,
   requireWebGPU,
   waitForFrameAdvance,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -72,7 +73,8 @@ test.describe('WDW ⊗ ζ suite rendering + performance', () => {
       // Warm up the render loop, then let the smoothed fps metric settle.
       const start = await getFrameCount(page)
       await waitForFrameAdvance(page, start + 120)
-      await page.waitForFunction(
+      await waitForPageCondition(
+        page,
         async () => {
           const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
           return mod.usePerformanceMetricsStore.getState().fps > 0

@@ -28,6 +28,7 @@ import {
 import {
   solveWheelerDeWitt,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '../../src/lib/physics/wheelerDeWitt/solver'
 
 const BCS: WheelerDeWittSolverInput['boundaryCondition'][] = ['noBoundary', 'tunneling', 'deWitt']
@@ -63,7 +64,7 @@ const startedAt = Date.now()
 for (const bc of BCS) {
   for (const m of MASSES) {
     for (const lambda of LAMBDAS) {
-      const wdw: WheelerDeWittSolverInput = {
+      const wdw: WheelerDeWittSolverInput3D = {
         boundaryCondition: bc,
         inflatonMass: m,
         cosmologicalConstant: lambda,
@@ -102,7 +103,7 @@ for (const bc of BCS) {
       })
       const margin = Math.min(rigidPhi1, rigidPhi2) / Math.max(rigidA, 1e-30)
       const wkbChamp = findWkbChampion(
-        computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
+        computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
       )
       const boChamp = findBornOppenheimerChampion(
         computeBornOppenheimerRates(out.chi, out.gridSize)

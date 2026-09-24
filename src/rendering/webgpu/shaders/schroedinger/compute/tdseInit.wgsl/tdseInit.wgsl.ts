@@ -5,7 +5,7 @@
  * a Gaussian wavepacket:
  *   psi(x) = A * exp(-|x - x0|^2 / (4*sigma^2)) * exp(i * k0 . x)
  *
- * For 'planeWave' mode, sigma is set very large (flat envelope).
+ * For 'planeWave' mode the envelope is dropped: psi(x) = A * exp(i * k0 . x).
  * For 'superposition' mode, two counter-propagating packets are summed.
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
@@ -49,11 +49,14 @@ const TDSE_INIT_BODY = /* wgsl */ `
     reVal = envelope * cos(kdotx);
     imVal = envelope * sin(kdotx);
   } else if (params.initCondition == 1u) {
-    // planeWave (Gaussian with very large sigma — effectively flat)
-    // The large sigma is set CPU-side via packetWidth, but we still
-    // apply the Gaussian to get smooth boundary falloff
-    reVal = envelope * cos(kdotx);
-    imVal = envelope * sin(kdotx);
+    // planeWave: psi = A * exp(i k0 . x), no envelope. This branch used to
+    // reuse the Gaussian envelope on the assumption that the CPU widened
+    // packetWidth for plane waves — it never did, so "Plane Wave" was the
+    // Gaussian packet (and the torus preset's lattice-commensurate k seeded a
+    // dispersing packet instead of a stationary mode). On a periodic box a
+    // commensurate k0 (k0·L = 2π·n) is an exact momentum eigenstate.
+    reVal = params.packetAmplitude * cos(kdotx);
+    imVal = params.packetAmplitude * sin(kdotx);
   } else if (params.initCondition == 2u) {
     // superposition: two counter-propagating Gaussian packets (amp ÷ √2 per arm).
     // Reuses the already-computed gauss = exp(-r2 * inv4Sigma2) — env1 shares
@@ -185,13 +188,22 @@ const TDSE_INIT_BODY = /* wgsl */ `
     let depthParam = clamp(params.packetMomentum[1], 0.0, 1.0);
     // Read velocity as fraction of local sound speed
     let vFrac = clamp(params.packetMomentum[2], -0.99, 0.99);
-    // β = √(depth² - v²) clamped; for depth=1, v=0 → β=1 (black soliton)
-    let beta = sqrt(max(depthParam * depthParam - vFrac * vFrac, 0.0));
+    // Grey solitons are a one-parameter family: ψ = √n₀·(i·u + β·tanh(β·x/(√2·ξ)))
+    // with β² + u² = 1, moving at v = u·c_s with notch depth 1 − n_min/n₀ = β².
+    // A non-zero velocity fixes u; at v = 0 the depth D selects the soliton
+    // (β² = D, u = √(1 − D) ≥ 0). The former β = √(D² − v²) broke β² + u² = 1
+    // for D < 1: the notch stayed black while the far-field density dropped to
+    // D²·n₀, far from the Thomas-Fermi background.
+    var uSoliton = vFrac;
+    if (abs(vFrac) < 1e-6) {
+      uSoliton = sqrt(max(1.0 - depthParam, 0.0));
+    }
+    let beta = sqrt(max(1.0 - uSoliton * uSoliton, 0.0));
     let xi_safe = max(xi, 1e-6);
     // 1/(√2·ξ) — computed once instead of divide per thread.
     let invSqrt2Xi = 0.70710678118654752 / xi_safe;
     let solitonRe = beta * tanh(beta * pos0s * invSqrt2Xi);
-    let solitonIm = vFrac;
+    let solitonIm = uSoliton;
     let rho0 = sqrt(n0);
     reVal = rho0 * solitonRe;
     imVal = rho0 * solitonIm;

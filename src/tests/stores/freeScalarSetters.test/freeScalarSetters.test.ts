@@ -7,9 +7,14 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import {
+  projectEta0ToPresetGauge,
+  reconcileCosmologyInvariants,
+} from '@/stores/slices/geometry/setters/freeScalarCosmologySetters'
 
 describe('free scalar field setters', () => {
   beforeEach(() => {
@@ -519,5 +524,94 @@ describe('free scalar field setters', () => {
       expect(getFSF().cosmology.lqcInitialRhoRatio).toBe(0.2)
       expect(getFSF().needsReset).toBe(false)
     })
+  })
+})
+
+// Regression: the η₀ setter stored off-gauge values verbatim. A shared link
+// `cos_bg=bianchiKasner&cos_eta0=-5` (URL apply order: preset → η₀ → enable)
+// left `enabled=true, preset=bianchiKasner, eta0=-5`, and
+// `sampleAdiabaticVacuum` → `computeBianchiKasnerCoefs` threw on every reset.
+describe('cosmology η₀ gauge projection', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useExtendedObjectStore.getState().setFreeScalarLatticeDim(3)
+  })
+
+  const cosmology = () => useExtendedObjectStore.getState().schroedinger.freeScalar.cosmology
+
+  it('keeps magnitude and applies each preset gauge sign', () => {
+    expect(projectEta0ToPresetGauge('bianchiKasner', -5)).toBe(5)
+    expect(projectEta0ToPresetGauge('bianchiKasner', 5)).toBe(5)
+    expect(projectEta0ToPresetGauge('deSitter', 3)).toBe(-3)
+    expect(projectEta0ToPresetGauge('kasner', -3)).toBe(-3)
+    expect(projectEta0ToPresetGauge('lqcBounce', -5)).toBe(5)
+    expect(projectEta0ToPresetGauge('lqcBounce', 100)).toBe(19)
+    expect(projectEta0ToPresetGauge('lqcBounce', 0.2)).toBe(1)
+  })
+
+  it('URL-order Bianchi-I link with negative η₀ yields a samplable state', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarCosmologyPreset('bianchiKasner')
+    s.setFreeScalarCosmologyEta0(-5)
+    s.setFreeScalarCosmologyEnabled(true)
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.cosmology.enabled).toBe(true)
+    expect(fs.cosmology.eta0).toBe(5)
+    const { phi } = sampleAdiabaticVacuum(
+      fs,
+      {
+        preset: fs.cosmology.preset,
+        spacetimeDim: fs.latticeDim + 1,
+        steepness: fs.cosmology.steepness,
+        hubble: fs.cosmology.hubble,
+        kasnerExponents: fs.cosmology.kasnerExponents,
+      },
+      fs.cosmology.eta0,
+      1
+    )
+    expect(phi.every(Number.isFinite)).toBe(true)
+  })
+
+  it('projects positive η₀ onto the η < 0 gauge for isotropic presets', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarCosmologyPreset('deSitter')
+    s.setFreeScalarCosmologyEta0(50)
+    expect(cosmology().eta0).toBe(-50)
+  })
+
+  it('snaps LQC η₀ into the bounce table window', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarCosmologyPreset('lqcBounce')
+    s.setFreeScalarCosmologyEta0(100)
+    expect(cosmology().eta0).toBe(19)
+    s.setFreeScalarCosmologyEta0(-4)
+    expect(cosmology().eta0).toBe(4)
+  })
+
+  it('enable fixes an off-gauge η₀ stored while cosmology was off', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarCosmologyPreset('bianchiKasner')
+    // Out-of-range dims store η₀ verbatim by contract.
+    s.setFreeScalarLatticeDim(1)
+    s.setFreeScalarCosmologyEta0(-2)
+    expect(cosmology().eta0).toBe(-2)
+    s.setFreeScalarLatticeDim(3)
+    s.setFreeScalarCosmologyEnabled(true)
+    expect(cosmology().enabled).toBe(true)
+    expect(cosmology().eta0).toBe(2)
+  })
+
+  it('reconcile repairs a partial scene patch that sets Bianchi-I over η₀ = -10', () => {
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    const patched = {
+      ...fs,
+      cosmology: { ...fs.cosmology, enabled: true, preset: 'bianchiKasner' as const, eta0: -10 },
+    }
+    expect(reconcileCosmologyInvariants(patched)).toEqual({
+      cosmology: { ...patched.cosmology, eta0: 10 },
+      needsReset: true,
+    })
+    const onGauge = { ...patched, cosmology: { ...patched.cosmology, eta0: 10 } }
+    expect(reconcileCosmologyInvariants(onGauge)).toEqual({})
   })
 })

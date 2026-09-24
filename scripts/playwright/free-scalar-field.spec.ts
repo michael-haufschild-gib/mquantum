@@ -31,6 +31,7 @@ import {
   waitForDiagnostics,
   waitForFrameAdvance,
   waitForModeReady,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -503,12 +504,33 @@ test.describe('free scalar field: self-interaction scenario presets', () => {
     }, presetId)
 
     // applyFreeScalarPreset uses a dynamic import internally, so the store
-    // update is async. Wait until needsReset flips to true (preset applied).
-    await page.waitForFunction(
-      async () => {
-        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-        return mod.useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset === true
+    // update is async. Wait until the preset's primitive overrides are in the
+    // store. (The former `needsReset === true` check raced the compute pass,
+    // which consumes the flag within a frame or two — it only "passed" while
+    // the async predicate made the wait a no-op.)
+    await waitForPageCondition(
+      page,
+      async (id) => {
+        const [{ FREE_SCALAR_PRESETS }, mod] = await Promise.all([
+          import('/src/lib/physics/freeScalar/presets.ts'),
+          import('/src/stores/scene/extendedObjectStore.ts'),
+        ])
+        const preset = (
+          FREE_SCALAR_PRESETS as { id: string; overrides: Record<string, unknown> }[]
+        ).find((p) => p.id === id)
+        if (!preset) return false
+        const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar as Record<
+          string,
+          unknown
+        >
+        // Arrays / objects are resized or sanitized per dimension, and the
+        // cosmology block is reconciled — compare the verbatim primitives only.
+        return Object.entries(preset.overrides).every(
+          ([key, value]) =>
+            typeof value === 'object' || key.startsWith('cosmology') || fs[key] === value
+        )
       },
+      presetId,
       { timeout: 5_000 }
     )
   }

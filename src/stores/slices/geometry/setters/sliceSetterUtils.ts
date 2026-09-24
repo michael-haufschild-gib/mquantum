@@ -14,6 +14,7 @@ import { defaultDiracGridPerDim, DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/ex
 import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeDefaultPow2GridPerDim } from '@/lib/math/ndArray'
+import { clampDtWithCfl } from '@/lib/physics/latticeCfl'
 export { clampDtWithCfl, computeCflLimit } from '@/lib/physics/latticeCfl'
 
 import type { ExtendedObjectSlice } from '../types'
@@ -229,3 +230,80 @@ export function nestedIntSetter<
     }))
   }
 }
+
+/** Compute domains carrying a per-mode copy of the shared PML absorber block. */
+type PmlDomainKey = 'tdse' | 'bec' | 'dirac' | 'freeScalar' | 'quantumWalk'
+
+/**
+ * Create a numeric PML setter that writes BOTH the shared
+ * `schroedinger.<field>` and the nested `<domain>.<field>` copy. Every compute
+ * strategy resolves the absorber through `applySharedPml`, where the shared
+ * value — always defined (defaults 0.2 width / 1e-6 reflection) — shadows the
+ * nested one, so a nested-only write was a silent no-op at runtime.
+ *
+ * @param ctx - Setter context
+ * @param domain - Compute domain whose nested copy is kept in sync
+ * @param field - `absorberWidth` or `pmlTargetReflection`
+ * @param min - Clamp minimum
+ * @param max - Clamp maximum
+ */
+export function sharedPmlClampedSetter(
+  ctx: SetterContext,
+  domain: PmlDomainKey,
+  field: 'absorberWidth' | 'pmlTargetReflection',
+  min: number,
+  max: number
+): (value: number) => void {
+  return (value: number) => {
+    if (!ctx.isFinite(value)) {
+      ctx.warnNonFinite(`${domain}.${field}`, value)
+      return
+    }
+    const clamped = Math.max(min, Math.min(max, value))
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        [field]: clamped,
+        [domain]: { ...state.schroedinger[domain], [field]: clamped },
+      },
+    }))
+  }
+}
+
+/**
+ * Boolean counterpart of {@link sharedPmlClampedSetter} for
+ * `absorberEnabled` (shared default `true`, which shadowed nested-only
+ * writes — e.g. `setQwAbsorberEnabled(false)` left the absorber on).
+ *
+ * @param ctx - Setter context
+ * @param domain - Compute domain whose nested copy is kept in sync
+ */
+export function sharedPmlEnabledSetter(
+  ctx: SetterContext,
+  domain: PmlDomainKey
+): (enabled: boolean) => void {
+  return (enabled: boolean) => {
+    if (typeof enabled !== 'boolean') return
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        absorberEnabled: enabled,
+        [domain]: { ...state.schroedinger[domain], absorberEnabled: enabled },
+      },
+    }))
+  }
+}
+
+/**
+ * dt range the TDSE / BEC setters accept (`setTdseDt` / `setBecDt`):
+ * [1e-4, min(0.05, 0.9 · CFL)]. The shared {@link clampDtWithCfl} defaults to
+ * the free-scalar floor of 1e-3, so every grid / spacing / compact-dimension /
+ * resize path that re-clamped TDSE or BEC dt through it silently raised
+ * sub-1e-3 steps — e.g. the sonic-horizon presets' tuned dt = 5e-4 ran at 1e-3.
+ */
+export const clampSchrodingerLatticeDt = (
+  dt: number,
+  spacing: number[],
+  latticeDim: number,
+  mass: number
+): number => clampDtWithCfl(dt, spacing, latticeDim, mass, 0.0001, 0.05)

@@ -34,7 +34,7 @@ import { tdsePotentialScaleBlock } from '../../shaders/schroedinger/compute/tdse
 import { tdseQuantumPressureBlock } from '../../shaders/schroedinger/compute/tdseQuantumPressure.wgsl'
 import {
   fftAxisUniformsBlock,
-  tdseSharedMemFFTTwiddleBlock,
+  sharedMemFFTMultiPencilTwiddleBlock,
 } from '../../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
 import {
   tdseFFTStageUniformsBlock,
@@ -153,10 +153,11 @@ export function composeTdseFftStageShader(): string {
  *
  * Twiddle-table fork of the kernel (stages >= 2 use the table). Stage-0
  * (W^0 = (1,0)) and stage-1 (twiddles in {(1,0), (0,-dir)}) remain specialized
- * and need no table read.
+ * and need no table read. Multi-pencil variant: max(1, 128/N) pencils per
+ * workgroup, dispatched with `sharedMemFFTWorkgroupCount`.
  */
 export function composeTdseFftSharedMemShader(): string {
-  return fftAxisUniformsBlock + tdseSharedMemFFTTwiddleBlock
+  return fftAxisUniformsBlock + sharedMemFFTMultiPencilTwiddleBlock
 }
 
 /** Pure WGSL for the TDSE kinetic (k-space diagonal phase) compute shader. */

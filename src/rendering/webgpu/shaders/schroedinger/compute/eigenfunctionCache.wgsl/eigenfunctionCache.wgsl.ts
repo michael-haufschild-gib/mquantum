@@ -13,6 +13,7 @@
  */
 
 import { EIGEN_CACHE_SAMPLES, MAX_EIGEN_FUNCS } from '../../quantum/eigenfunctionCache.wgsl'
+import { HO_OMEGA_FLOOR_WGSL } from '../../quantum/ho1d.wgsl'
 
 /**
  * Uniform struct for eigenfunction cache compute parameters.
@@ -77,7 +78,7 @@ const HO_NORM_C: array<f32, 7> = array<f32, 7>(
 // is reachable now.)
 fn computeHo1DPhiDeriv(n: i32, x: f32, omega: f32) -> vec2f {
   if (n < 0 || n > 6) { return vec2f(0.0, 0.0); }
-  let omegaClamped = max(omega, 0.01);
+  let omegaClamped = max(omega, ${HO_OMEGA_FLOOR_WGSL});
   let sqrtOmega = sqrt(omegaClamped);
   let u = sqrtOmega * x;
   let u2 = u * u;

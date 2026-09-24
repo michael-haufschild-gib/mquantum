@@ -16,7 +16,7 @@
  *
  * Requires freeScalarNDIndexBlock to be prepended (for linearToND).
  *
- * @workgroup_size(256)
+ * @workgroup_size(128)
  * @module
  */
 
@@ -36,18 +36,21 @@ struct ObsReduceUniforms {
 @group(0) @binding(2) var<storage, read_write> partials: array<f32>;
 @group(0) @binding(3) var<storage, read> potentialBuf: array<f32>;
 
-// Max channels: 2 + 2*11 = 24. Shared memory: 24 * 256 = 6144 floats.
+// Max channels: 2 + 2*11 = 24. Shared memory: 24 * 128 = 3072 floats = 12 KiB.
+// WG_SIZE is 128, not 256: 24 * 256 f32 = 24 KiB exceeds WebGPU's guaranteed
+// maxComputeWorkgroupStorageSize (16 KiB), so the pipeline failed on adapters
+// that expose only the spec minimum.
 // Layout is CHANNEL-MAJOR: sdata[ch * WG_SIZE + local]. This gives bank-
-// conflict-free access in the tree reduction because WG_SIZE=256 is a
+// conflict-free access in the tree reduction because WG_SIZE=128 is a
 // multiple of the 32-bank width — every warp hits 32 distinct banks
-// (bank = (ch*256 + local) mod 32 = local mod 32). The previous
+// (bank = (ch*128 + local) mod 32 = local mod 32). The previous
 // thread-major layout sdata[local * 24 + ch] caused 4-way bank conflicts
 // (gcd(24, 32) = 8 ⇒ 4 threads per warp per bank per channel access).
 const MAX_CHANNELS: u32 = 24u;
-const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;  // MAX_CHANNELS * WG_SIZE
+const WG_SIZE: u32 = 128u;
+var<workgroup> sdata: array<f32, 3072>;  // MAX_CHANNELS * WG_SIZE (12 KiB)
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(128)
 fn main(
   @builtin(global_invocation_id) gid: vec3u,
   @builtin(local_invocation_id) lid: vec3u,
@@ -98,7 +101,7 @@ fn main(
 
   // Tree reduction within workgroup — all channels.
   // Channel-major layout: sdata[ch * WG_SIZE + local] += sdata[ch * WG_SIZE + local + stride].
-  for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
+  for (var stride: u32 = 64u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
         let chBase = ch * WG_SIZE;
@@ -125,7 +128,7 @@ fn main(
  * Single-workgroup reduction of partial sums from Pass 1 into final results.
  * Output: [norm, x0_mean, x0_sq, ..., xD_mean, xD_sq, potentialEnergy]
  *
- * @workgroup_size(256)
+ * @workgroup_size(128)
  */
 export const observablesPositionFinalizeBlock = /* wgsl */ `
 struct ObsReduceUniforms {
@@ -144,10 +147,10 @@ struct ObsReduceUniforms {
 
 // Channel-major layout matches pass 1 — see rationale in observablesPositionReduceBlock.
 const MAX_CHANNELS: u32 = 24u;
-const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;
+const WG_SIZE: u32 = 128u;
+var<workgroup> sdata: array<f32, 3072>;
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(128)
 fn main(
   @builtin(local_invocation_id) lid: vec3u,
 ) {
@@ -171,7 +174,7 @@ fn main(
   workgroupBarrier();
 
   // Tree reduction (channel-major, bank-conflict-free).
-  for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
+  for (var stride: u32 = 64u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
         let chBase = ch * WG_SIZE;

@@ -237,7 +237,7 @@ describe('computeReconstructCoefficients', () => {
       [Math.PI, 0] // E_0 - E_1 = pi
     )
     const { f32, u32 } = allocReconstructBuffers()
-    // phaseAngle = -(E_j - E_k) * t = -pi, cos(-pi) = -1, sin(-pi) ≈ 0
+    // phaseAngle = +(E_j - E_k) * t = pi, cos(pi) = -1, sin(pi) ≈ 0
     //   phasedRe = 2 * (prodRe * -1 - prodIm * 0) = -2 * (0.25) = -0.5
     //   phasedIm ≈ 0
     computeReconstructCoefficients(crossPairs, sch, 1, 1, f32, u32)
@@ -259,7 +259,7 @@ describe('computeReconstructCoefficients', () => {
     const b = allocReconstructBuffers()
     computeReconstructCoefficients(crossPairs, sch, 2.0, 0.5, a.f32, a.u32)
     computeReconstructCoefficients(crossPairs, sch, 1.0, 1.0, b.f32, b.u32)
-    // Both reduce to phaseAngle = -(1 - 0) * 1 = -1 rad, so phasedRe and
+    // Both reduce to phaseAngle = +(1 - 0) * 1 = 1 rad, so phasedRe and
     // phasedIm must match bit-for-bit.
     expect(a.f32[4]).toBeCloseTo(b.f32[4]!, 10)
     expect(a.f32[5]).toBeCloseTo(b.f32[5]!, 10)
@@ -464,5 +464,69 @@ describe('MAX_WIGNER_* capacity invariants', () => {
     // slot exists only so the total is a multiple of 16 per WGSL uniform
     // buffer alignment rules. Not a capacity increase.
     expect(MAX_WIGNER_CROSS_PAIRS).toBeLessThan(29)
+  })
+})
+
+// Regression: the cross-pair phase used e^{−i(E_j − E_k)t}. W_{j,k} in
+// wignerHO.wgsl is the Wigner transform of |k⟩⟨j|, so c_j* c_k needs
+// e^{+i(E_j − E_k)t}; the old sign ran the HO phase-space rotation backwards
+// (W_shown(x, p, t) = W(x, −p, t) for real coefficients) while ⟨p⟩(t) and the
+// momentum representation rotate clockwise.
+describe('computeReconstructCoefficients — phase-space rotation direction', () => {
+  const invPi = 1 / Math.PI
+
+  /** Direct W(x,p) = (1/π)∫ψ*(x+y)ψ(x−y)e^{2ipy}dy of ψ(t) = (e^{−iE0t}φ0 + e^{−iE1t}φ1)/√2. */
+  function directWigner(x: number, p: number, t: number): number {
+    const phi0 = (s: number) => Math.PI ** -0.25 * Math.exp(-0.5 * s * s)
+    const phi1 = (s: number) => Math.PI ** -0.25 * Math.SQRT2 * s * Math.exp(-0.5 * s * s)
+    const psi = (s: number): [number, number] => [
+      Math.SQRT1_2 * (Math.cos(0.5 * t) * phi0(s) + Math.cos(1.5 * t) * phi1(s)),
+      -Math.SQRT1_2 * (Math.sin(0.5 * t) * phi0(s) + Math.sin(1.5 * t) * phi1(s)),
+    ]
+    const h = 2e-3
+    let acc = 0
+    for (let y = -8; y <= 8; y += h) {
+      const [ar, ai] = psi(x + y)
+      const [br, bi] = psi(x - y)
+      const re = ar * br + ai * bi
+      const im = ar * bi - ai * br
+      acc += (re * Math.cos(2 * p * y) - im * Math.sin(2 * p * y)) * h
+    }
+    return acc * invPi
+  }
+
+  it('reconstructs the directly-transformed Wigner function at t = π/2 and t = 1', () => {
+    const { crossPairs } = buildCrossPairMap(2)
+    const sch = makeSchroedingerData(
+      [
+        [Math.SQRT1_2, 0],
+        [Math.SQRT1_2, 0],
+      ],
+      [0.5, 1.5]
+    )
+    const data = new ArrayBuffer(WIGNER_RECONSTRUCT_PARAMS_SIZE)
+    const f32 = new Float32Array(data)
+    const u32 = new Uint32Array(data)
+
+    for (const t of [Math.PI / 2, 1]) {
+      computeReconstructCoefficients(crossPairs, sch, t, 1, f32, u32)
+      const phasedRe = f32[4]!
+      const phasedIm = f32[5]!
+      for (const [x, p] of [
+        [0, 0.8],
+        [0, -0.8],
+        [0.4, 0.5],
+      ] as const) {
+        const u2 = x * x + p * p
+        const e = Math.exp(-u2)
+        const w00 = invPi * e
+        const w11 = -invPi * (1 - 2 * u2) * e
+        // W_{0,1} = conj(W_{1,0}), W_{1,0} = (√2/π)(x + ip)e^{−u²} (wignerHO.wgsl, ω = 1)
+        const crossRe = Math.SQRT2 * x * e * invPi
+        const crossIm = -Math.SQRT2 * p * e * invPi
+        const reconstructed = 0.5 * w00 + 0.5 * w11 + (phasedRe * crossRe - phasedIm * crossIm)
+        expect(reconstructed).toBeCloseTo(directWigner(x, p, t), 4)
+      }
+    }
   })
 })

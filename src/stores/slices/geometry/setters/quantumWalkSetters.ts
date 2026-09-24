@@ -16,7 +16,11 @@ import {
   type SchroedingerPresetApplyOptions,
 } from '@/stores/utils/dynamicPresetImport'
 
-import type { SetterContext } from './sliceSetterUtils'
+import {
+  type SetterContext,
+  sharedPmlClampedSetter,
+  sharedPmlEnabledSetter,
+} from './sliceSetterUtils'
 
 /** Actions exposed by the quantum-walk setter bundle. */
 export interface QuantumWalkSetters {
@@ -105,36 +109,17 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
       }))
     },
 
-    setQwAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, absorberEnabled: enabled },
-        },
-      }))
-    },
-
-    setQwAbsorberWidth: (width) => {
-      if (!isFinite(width)) return
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, absorberWidth: clamped },
-        },
-      }))
-    },
-
-    setQwPmlTargetReflection: (r) => {
-      if (!isFinite(r)) return
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, pmlTargetReflection: clamped },
-        },
-      }))
-    },
+    // PML is resolved through applySharedPml (shared value wins), so these
+    // write the shared schroedinger.* field as well as the nested copy.
+    setQwAbsorberEnabled: sharedPmlEnabledSetter(ctx, 'quantumWalk'),
+    setQwAbsorberWidth: sharedPmlClampedSetter(ctx, 'quantumWalk', 'absorberWidth', 0.05, 0.5),
+    setQwPmlTargetReflection: sharedPmlClampedSetter(
+      ctx,
+      'quantumWalk',
+      'pmlTargetReflection',
+      1e-12,
+      0.999
+    ),
 
     setQwSlicePosition: (dimIndex: number, value: number) => {
       if (!isFinite(value)) return

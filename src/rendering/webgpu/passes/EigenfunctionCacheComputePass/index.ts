@@ -22,6 +22,7 @@ import {
   MAX_EIGEN_FUNCS,
   MAX_EIGEN_FUNCS_VEC4_COUNT,
 } from '../../shaders/schroedinger/quantum/eigenfunctionCache.wgsl'
+import { HO_OMEGA_FLOOR } from '../../shaders/schroedinger/quantum/ho1d.wgsl'
 import { MAX_DIM, MAX_TERMS } from '../../shaders/schroedinger/uniforms.wgsl'
 
 // SchroedingerUniforms byte offsets — pulled from the declarative struct
@@ -289,7 +290,9 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
 
     for (let i = 0; i < numUniqueFuncs; i++) {
       const { n, omega } = uniqueParams[i]!
-      const sqrtOmega = Math.sqrt(Math.max(omega, 0.01))
+      // Same floor as the compute kernel, so the sampled domain matches the
+      // function it holds (momentum ω_k = s²/(ħ²ω) can sit far below 0.01).
+      const sqrtOmega = Math.sqrt(Math.max(omega, HO_OMEGA_FLOOR))
 
       // Domain: classical turning point + Gaussian tail margin
       // For position: x_tp = sqrt(2n+1) / sqrt(omega), margin = 4 / sqrt(omega)

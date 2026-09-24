@@ -11,6 +11,10 @@
  */
 import { describe, expect, it } from 'vitest'
 
+import {
+  computeHOBoundingRadius,
+  computeHOMomentumBoundingRadius,
+} from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
 import {
   applyHOMomentumTransform,
@@ -46,6 +50,48 @@ describe('applyHOMomentumTransform', () => {
       expect(floatView[I.omega + j]).toBeCloseTo(expected, 5)
     }
     expect(intView[I.representationMode]).toBe(0)
+  })
+
+  it('folds the momentum zoom into omega: omega -> scale²/(hbar²·omega)', () => {
+    const { floatView, intView } = makeBuffer()
+    for (let j = 0; j < MAX_DIM; j++) floatView[I.omega + j] = j + 1
+    intView[I.termCount] = 1
+
+    applyHOMomentumTransform(floatView, intView, 3, /* hbar = */ 2, /* momentumScale = */ 3)
+
+    for (let j = 0; j < MAX_DIM; j++) {
+      // scale² / (hbar²·omega) = 9 / (4·(j+1))
+      expect(floatView[I.omega + j]).toBeCloseTo(9 / (4 * (j + 1)), 5)
+    }
+  })
+
+  it('renders the extent that computeHOMomentumBoundingRadius reserves for a zoomed state', () => {
+    // Regression: the HO shader never read momentumScale, so the bounding
+    // sphere (R_k / scale) shrank while the rendered density did not —
+    // momentum lobes were clipped at scale > 1.
+    const { floatView, intView } = makeBuffer()
+    const omega = 0.8
+    const hbar = 1.5
+    const momentumScale = 2
+    floatView[I.omega] = omega
+    intView[I.termCount] = 1
+
+    applyHOMomentumTransform(floatView, intView, 1, hbar, momentumScale)
+
+    const renderedExtent = computeHOBoundingRadius(1, [[3]], [floatView[I.omega]!])
+    const reservedExtent = computeHOMomentumBoundingRadius(1, [[3]], [omega], momentumScale / hbar)
+    expect(reservedExtent).toBeGreaterThan(2.0) // above the MIN_BOUND_R floor
+    expect(renderedExtent).toBeCloseTo(reservedExtent, 4)
+  })
+
+  it('treats a non-finite or non-positive momentumScale as 1', () => {
+    for (const bad of [Number.NaN, 0, -2, Number.POSITIVE_INFINITY]) {
+      const { floatView, intView } = makeBuffer()
+      floatView[I.omega] = 2
+      intView[I.termCount] = 1
+      applyHOMomentumTransform(floatView, intView, 1, 1, bad)
+      expect(floatView[I.omega]).toBeCloseTo(0.5, 6)
+    }
   })
 
   it('clamps omega to 0.01 floor before inverting (avoids divide-by-near-zero blowup)', () => {

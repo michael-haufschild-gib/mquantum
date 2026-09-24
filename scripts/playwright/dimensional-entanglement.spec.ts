@@ -19,6 +19,7 @@ import {
   gotoModeWithParams,
   requireWebGPU,
   waitForModeReady,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -68,7 +69,8 @@ async function readEntanglementStore(page: Page): Promise<{
 
 /** Wait for entanglement history to have at least `minCount` entries. */
 async function waitForEntanglementData(page: Page, minCount: number): Promise<void> {
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async ({ storePath, min }) => {
       const mod = await import(/* @vite-ignore */ storePath)
       return mod.useCoordinateEntanglementStore.getState().historyCount >= min

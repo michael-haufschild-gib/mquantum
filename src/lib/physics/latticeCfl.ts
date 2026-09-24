@@ -30,16 +30,27 @@ export const computeCflLimit = (spacing: number[], latticeDim: number, mass: num
 }
 
 /**
- * Clamp dt to [0.001, min(0.1, CFL limit * 0.9)].
+ * Clamp dt to [minDt, min(capDt, CFL limit * 0.9)] — by default
+ * [0.001, min(0.1, CFL · 0.9)], the free-scalar-field range.
+ *
+ * @param dt - Requested time step
+ * @param spacing - Per-axis lattice spacing
+ * @param latticeDim - Active lattice dimension
+ * @param mass - Field mass
+ * @param minDt - Lower bound (default 0.001)
+ * @param capDt - Absolute upper bound before the CFL cap (default 0.1)
+ * @returns The clamped time step
  */
 export const clampDtWithCfl = (
   dt: number,
   spacing: number[],
   latticeDim: number,
-  mass: number
+  mass: number,
+  minDt = 0.001,
+  capDt = 0.1
 ): number => {
   const cflLimit = computeCflLimit(spacing, latticeDim, mass)
-  const maxDt = Math.min(0.1, cflLimit * 0.9)
+  const maxDt = Math.min(capDt, cflLimit * 0.9)
   const safeDt = typeof dt === 'number' && Number.isFinite(dt) ? dt : maxDt
-  return Math.max(0.001, Math.min(maxDt, safeDt))
+  return Math.max(minDt, Math.min(maxDt, safeDt))
 }

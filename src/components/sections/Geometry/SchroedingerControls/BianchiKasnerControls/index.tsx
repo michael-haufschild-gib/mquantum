@@ -129,6 +129,13 @@ export const BianchiKasnerControls: React.FC<BianchiKasnerControlsProps> = React
           {sumP2.toFixed(4)} {Math.abs(sumP2 - 1) < 1e-3 ? '[ok]' : '[fail]'}
         </div>
 
+        {sumP > 3 + 1e-12 && (
+          <div className="text-xs text-warning" data-testid="bianchi-gauge-warning">
+            Σp &gt; 3 has no positive-η gauge: the background falls back to flat (Minkowski)
+            coefficients until Σp ≤ 3.
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -149,8 +156,8 @@ export const BianchiKasnerControls: React.FC<BianchiKasnerControlsProps> = React
         </div>
 
         <div className="text-xs text-text-tertiary italic">
-          Only the first three spatial axes feel the anisotropy — higher-dim lattices stay isotropic
-          on the extra axes. Generalised conformal time η &gt; 0.
+          Bianchi-I carries exactly three Kasner axes, so this preset runs on 3D lattices only (it
+          is hidden for other lattice dimensions). Generalised conformal time η &gt; 0.
         </div>
       </ControlGroup>
     )

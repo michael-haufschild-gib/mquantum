@@ -70,3 +70,29 @@ describe('DiracComputePass save-state injection', () => {
     expect(Array.from(interleaved)).toEqual([1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15, 8, 16])
   })
 })
+
+// Regression: reinitialization reset the CPU initialNorm but left the GPU
+// renormalize target at the previous run's norm, so the per-frame renorm pass
+// rescaled the fresh (or freshly loaded) spinor to the stale norm before the
+// first readback captured it.
+describe('DiracComputePass reinitialization renormalize target', () => {
+  it('clears the GPU target alongside the CPU baseline', () => {
+    const writeBuffer = vi.fn()
+    const renormBuffer = { label: 'renorm' } as unknown as GPUBuffer
+    const pass = createReadyPass()
+    const internals = pass as unknown as DiracPassInternals & {
+      bg: { renormalizeUniformBuffer: GPUBuffer } | null
+      initialNorm: number
+    }
+    internals.bg = { renormalizeUniformBuffer: renormBuffer }
+    internals.initialNorm = 5
+    pass.setLoadedWavefunction(new Float32Array(8).fill(1), new Float32Array(8))
+
+    internals.maybeInitialize(createContext(writeBuffer), config)
+
+    expect(internals.initialNorm).toBe(-1)
+    const renormWrite = writeBuffer.mock.calls.find((call: unknown[]) => call[0] === renormBuffer)
+    expect(renormWrite?.[1]).toBe(4)
+    expect(Array.from(renormWrite?.[2] as Float32Array)).toEqual([0])
+  })
+})

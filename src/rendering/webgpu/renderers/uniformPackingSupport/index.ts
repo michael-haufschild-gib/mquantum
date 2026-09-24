@@ -21,6 +21,7 @@ import {
 import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
+import { HO_OMEGA_FLOOR } from '../../shaders/schroedinger/quantum/ho1d.wgsl'
 import { MAX_DIM, MAX_TERMS } from '../../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb, type Rgb } from '../../utils/color'
 import { sanitizePixelExtent } from '../../utils/sceneMath'
@@ -52,6 +53,23 @@ function finiteNumber(value: number | undefined, fallback: number, min = -Infini
 // =========================================================================
 
 /**
+ * Frequency the HO momentum representation renders axis j with:
+ * ω_k = s² / (ħ²·ω) for momentum zoom s (non-finite or ≤ 0 → 1).
+ *
+ * Shared by {@link applyHOMomentumTransform} and the density-gain /
+ * peak-density calibration so both describe the same rendered state.
+ *
+ * @param omega - Position-space angular frequency ω_j
+ * @param hbar - Reduced Planck constant (1 for k-space display)
+ * @param momentumScale - Reciprocal-space zoom s
+ * @returns The momentum-space frequency written into the omega uniform
+ */
+export function hoMomentumOmega(omega: number, hbar: number, momentumScale: number): number {
+  const zoom = Number.isFinite(momentumScale) && momentumScale > 0 ? momentumScale : 1.0
+  return (zoom * zoom) / (hbar * hbar * Math.max(omega, 0.01))
+}
+
+/**
  * In-place transform of already-packed Schroedinger uniforms for HO momentum space.
  *
  * Physics: HO eigenfunctions are eigenfunctions of the Fourier transform.
@@ -59,24 +77,30 @@ function finiteNumber(value: number | undefined, fallback: number, min = -Infini
  * This inverts omegas and applies phase rotations to coefficients so the GPU shader
  * runs the normal position-mode path and produces correct momentum-space results.
  *
+ * Momentum zoom: the shader samples k = x · s with s = momentumScale / hbar (the
+ * same convention as the hydrogen momentum path). Because
+ * phi_n(s·x; w) = s^{-1/2} · phi_n(x; s²·w), the zoom plus its Jacobian s^{D/2}
+ * folds exactly into the frequency: omega_j -> s_k² / omega_j with s_k = momentumScale / hbar.
+ * This keeps the rendered extent consistent with computeHOMomentumBoundingRadius.
+ *
  * Must be called AFTER packSchroedingerUniforms and BEFORE the buffer write.
  *
  * @param floatView - Float32 view of the Schroedinger uniform buffer
  * @param intView - Int32 view of the same buffer
  * @param dimension - Number of spatial dimensions
  * @param hbar - Reduced Planck constant (1.0 for k-space, user value for p-space)
+ * @param momentumScale - Reciprocal-space zoom factor (k → k·scale); default 1.0
  */
 export function applyHOMomentumTransform(
   floatView: Float32Array,
   intView: Int32Array,
   dimension: number,
-  hbar: number
+  hbar: number,
+  momentumScale: number = 1.0
 ): void {
-  // 1. Invert omegas: omega_j -> 1/(hbar^2 * omega_j)
-  const hbar2 = hbar * hbar
+  // 1. Invert omegas: omega_j -> momentumScale^2 / (hbar^2 * omega_j)
   for (let j = 0; j < MAX_DIM; j++) {
-    const omega = floatView[I.omega + j]!
-    floatView[I.omega + j] = 1.0 / (hbar2 * Math.max(omega, 0.01))
+    floatView[I.omega + j] = hoMomentumOmega(floatView[I.omega + j]!, hbar, momentumScale)
   }
 
   // 2. Rotate coefficients by (-i)^{sum n_j} per term
@@ -522,8 +546,12 @@ export function computeCanonicalCompensation(
         ? Math.max(0, Math.min(6, Math.round(nRaw)))
         : 0
     const omegaRaw = preset.omega[j]
+    // Same floor as the shader's HO evaluators: the momentum representation
+    // calibrates against ω_k = s²/(ħ²ω), which can sit far below 0.01.
     const omega =
-      typeof omegaRaw === 'number' && Number.isFinite(omegaRaw) ? Math.max(omegaRaw, 0.01) : 1.0
+      typeof omegaRaw === 'number' && Number.isFinite(omegaRaw)
+        ? Math.max(omegaRaw, HO_OMEGA_FLOOR)
+        : 1.0
 
     // Find max of H_n^2(u) * exp(-u^2) numerically over u in [0, 5]
     let maxHermiteSq = 0

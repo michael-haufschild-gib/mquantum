@@ -8,6 +8,7 @@
  * - Precomputed energies
  */
 
+import { MIN_DIMENSION } from '@/constants/dimension'
 import {
   SCHROEDINGER_MAX_DIM as MAX_DIM,
   SCHROEDINGER_MAX_TERMS as MAX_TERMS,
@@ -147,6 +148,67 @@ function generateTermQuantumNumbers(termRng: () => number, dim: number, nMax: nu
   return n
 }
 
+/** Redraws allowed before falling back to the lowest unused state. */
+const MAX_TERM_RESAMPLES = 64
+
+/**
+ * Pick quantum numbers for a seeded term that no earlier term already uses.
+ *
+ * Σ|c_k|² = 1 is the state norm only when the terms are distinct (orthogonal)
+ * eigenstates; a repeated (n_1 … n_D) interferes with its twin and is not a
+ * separate level for the open-system propagator. Collisions are redrawn from
+ * the term's own sequence, then resolved by the first unused state in
+ * mixed-radix order (extra dimensions even-only, as sampled).
+ *
+ * @param termRng - Per-term PRNG (continues the term's sequence)
+ * @param dim - Number of dimensions
+ * @param nMax - Maximum quantum number per dimension
+ * @param used - Keys of the quantum-number rows already in the superposition
+ * @returns Distinct quantum numbers, or null when every state is taken
+ */
+function generateDistinctTermQuantumNumbers(
+  termRng: () => number,
+  dim: number,
+  nMax: number,
+  used: ReadonlySet<string>
+): number[] | null {
+  let n = generateTermQuantumNumbers(termRng, dim, nMax)
+  for (let attempt = 0; attempt < MAX_TERM_RESAMPLES && used.has(n.join(',')); attempt++) {
+    n = generateTermQuantumNumbers(termRng, dim, nMax)
+  }
+  return used.has(n.join(',')) ? firstUnusedState(dim, nMax, used) : n
+}
+
+/**
+ * Advance a state to its mixed-radix successor in place (dims ≥ 3 step by 2).
+ * @returns false once every state has been visited
+ */
+function advanceState(state: number[], nMax: number, evenMax: number): boolean {
+  for (let j = 0; j < state.length; j++) {
+    const next = (state[j] ?? 0) + (j >= 3 ? 2 : 1)
+    if (next <= (j >= 3 ? evenMax : nMax)) {
+      state[j] = next
+      return true
+    }
+    state[j] = 0
+  }
+  return false
+}
+
+/**
+ * Lowest state (mixed-radix order) not in `used`. At most used.size states
+ * precede it, so this walks ≤ used.size + 1 candidates.
+ * @returns The state, or null when every state is taken
+ */
+function firstUnusedState(dim: number, nMax: number, used: ReadonlySet<string>): number[] | null {
+  const evenMax = nMax & ~1
+  const candidate = new Array<number>(dim).fill(0)
+  do {
+    if (!used.has(candidate.join(','))) return candidate
+  } while (advanceState(candidate, nMax, evenMax))
+  return null
+}
+
 function sanitizeNamedQuantumNumbers(row: readonly number[], dim: number, nMax: number): number[] {
   const evenMax = nMax & ~1
   const n: number[] = []
@@ -183,12 +245,14 @@ function computeTermEnergyAndCoeff(
  * Generate a quantum preset with the given parameters.
  *
  * Uses per-term independent PRNG sequences so that each term's quantum
- * numbers and coefficients are determined solely by (seed, termIndex).
- * Changing termCount or maxQuantumNumber produces incremental visual
+ * numbers and coefficients are determined by (seed, termIndex); a term that
+ * would repeat an earlier term's eigenstate is redrawn from its own sequence,
+ * so the terms are always distinct. Changing termCount leaves earlier terms
+ * untouched, and changing maxQuantumNumber produces incremental visual
  * changes rather than wholesale randomization.
  *
  * @param seed - Random seed for deterministic generation
- * @param dimension - Number of dimensions (3-11)
+ * @param dimension - Number of dimensions (2-11)
  * @param termCount - Number of superposition terms (1-8)
  * @param maxN - Maximum quantum number per dimension (2-6)
  * @param frequencySpread - Variation in ω values (0-0.5)
@@ -205,7 +269,11 @@ export function generateQuantumPreset(
   // Clamp parameters to valid ranges
   const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 0
   const configuredTermCount = quantumNumberRows?.length ?? termCount
-  const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, 3, MAX_DIM, 'floor')
+  // Clamp to the scene's supported range (2D included). A floor of 3 gave a
+  // 2D scene a phantom z quantum number whose ω_z(n_z + ½) entered every
+  // term's energy — the 2D evaluator ignores z, so the relative phases beat
+  // at frequencies the displayed state does not have.
+  const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, MIN_DIMENSION, MAX_DIM, 'floor')
   const terms = clampFiniteInteger(configuredTermCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS, 'floor')
   const nMax = clampFiniteInteger(maxN, DEFAULT_MAX_N, 1, MAX_QUANTUM_NUMBER, 'floor')
   const spread = clampFinite(frequencySpread, DEFAULT_FREQUENCY_SPREAD, 0, 0.5)
@@ -223,12 +291,18 @@ export function generateQuantumPreset(
   const coefficients: [number, number][] = []
   const energies: number[] = []
 
+  const usedStates = new Set<string>()
+
   for (let k = 0; k < terms; k++) {
     const termRng = mulberry32((safeSeed + (k + 1) * TERM_RNG_PRIME) | 0)
     const configuredRow = quantumNumberRows?.[k]
     const n = configuredRow
       ? sanitizeNamedQuantumNumbers(configuredRow, dim, nMax)
-      : generateTermQuantumNumbers(termRng, dim, nMax)
+      : generateDistinctTermQuantumNumbers(termRng, dim, nMax, usedStates)
+    // Every state is taken (only below the store's nMax ≥ 2 floor, e.g. 2D
+    // with nMax = 1 holds 4 states): stop rather than repeat an eigenstate.
+    if (!n) break
+    usedStates.add(n.join(','))
     quantumNumbers.push(n)
 
     const { energy, coeff } = computeTermEnergyAndCoeff(n, omega, termRng)
@@ -247,7 +321,7 @@ export function generateQuantumPreset(
   }
 
   return {
-    termCount: terms,
+    termCount: quantumNumbers.length,
     omega,
     quantumNumbers,
     coefficients,

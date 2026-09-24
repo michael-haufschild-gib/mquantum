@@ -13,7 +13,10 @@
  *   0 none
  *   1 harmonicTrap:  V = 1/2 mass omega^2 |x|^2
  *   2 barrier:       V = wellDepth   if |x0| < wellWidth/2 (first dim)
- *   3 doubleWell:    V = wellDepth (1 - exp(-|x|^2 / wellWidth^2))  (radial Gaussian)
+ *   3 doubleWell:    V = wellDepth ((x0^2 - a^2) / a^2)^2, a = wellWidth/2 (first dim)
+ *                    — minima at x0 = ±a, barrier of height wellDepth at x0 = 0.
+ *                    (Formerly V = wellDepth (1 - exp(-|x|^2 / wellWidth^2)): a single
+ *                    radial Gaussian well with one minimum, so no inter-well tunneling.)
  *
  * Requires pauliUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -59,14 +62,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       V = params.wellDepth;
     }
   } else if (params.potentialType == 3u) {
-    // Double well (radial Gaussian): V = D (1 - exp(-|x|^2 / W^2))
-    var r2: f32 = 0.0;
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      let p = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-      r2 += p * p;
-    }
-    let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
-    V = params.wellDepth * (1.0 - exp(-r2 / W2));
+    // Double well along the first dimension: V = V0 ((x0^2 - a^2) / a^2)^2,
+    // a = wellWidth / 2 — minima at x0 = ±a, barrier V0 at x0 = 0.
+    let x0 = (f32(coords[0u]) - f32(params.gridSize[0u]) * 0.5 + 0.5) * params.spacing[0u];
+    let aDw = max(params.wellWidth * 0.5, 1e-6);
+    let a2Dw = aDw * aDw;
+    let qDw = (x0 * x0 - a2Dw) / a2Dw;
+    V = params.wellDepth * qDw * qDw;
   }
 
   potential[idx] = V;
@@ -104,12 +106,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       V = params.wellDepth;
     }
   } else if (params.potentialType == 3u) {
+    // Double well along x: V = V0 ((x^2 - a^2) / a^2)^2, a = wellWidth / 2.
     let px = (f32(gid.x) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
-    let py = (f32(gid.y) - f32(params.gridSize[1]) * 0.5 + 0.5) * params.spacing[1];
-    let pz = (f32(gid.z) - f32(params.gridSize[2]) * 0.5 + 0.5) * params.spacing[2];
-    let r2 = px * px + py * py + pz * pz;
-    let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
-    V = params.wellDepth * (1.0 - exp(-r2 / W2));
+    let aDw = max(params.wellWidth * 0.5, 1e-6);
+    let a2Dw = aDw * aDw;
+    let qDw = (px * px - a2Dw) / a2Dw;
+    V = params.wellDepth * qDw * qDw;
   }
 
   potential[idx] = V;

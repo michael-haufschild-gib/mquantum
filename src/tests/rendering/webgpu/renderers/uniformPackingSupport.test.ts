@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { QuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { computeCanonicalCompensation } from '@/rendering/webgpu/renderers/uniformPackingSupport'
+import { HO_OMEGA_FLOOR } from '@/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl'
 
 /**
  * Regression tests locking in the physicist's Hermite convention used by the
@@ -89,5 +90,34 @@ describe('computeCanonicalCompensation — Hermite convention lock', () => {
     expect(Number.isFinite(compensation)).toBe(true)
     expect(peakDensity).toBeGreaterThan(0)
     expect(Number.isFinite(peakDensity)).toBe(true)
+  })
+})
+
+// The malformed-preset case above exits through the termCount = ∞ guard before
+// any ω / n sanitisation runs, so it would still pass with that sanitisation
+// removed. Pin the per-axis handling on a finite term count.
+describe('computeCanonicalCompensation — per-axis sanitisation', () => {
+  it('treats non-finite ω as 1, floors ω at HO_OMEGA_FLOOR and clamps n to [0, 6]', () => {
+    const malformed: QuantumPreset = {
+      termCount: 1,
+      omega: [Number.NaN, Number.POSITIVE_INFINITY, -1],
+      quantumNumbers: [[Number.NaN, 2, 99]],
+      coefficients: [[1, 0]],
+      energies: [0],
+    }
+    const sanitized: QuantumPreset = {
+      termCount: 1,
+      omega: [1, 1, HO_OMEGA_FLOOR],
+      quantumNumbers: [[0, 2, 6]],
+      coefficients: [[1, 0]],
+      energies: [0],
+    }
+
+    const got = computeCanonicalCompensation(malformed, 3, 2.0)
+    const want = computeCanonicalCompensation(sanitized, 3, 2.0)
+
+    expect(want.peakDensity).not.toBe(0.1) // not the degenerate fallback
+    expect(got.peakDensity).toBeCloseTo(want.peakDensity, 12)
+    expect(got.compensation).toBeCloseTo(want.compensation, 12)
   })
 })

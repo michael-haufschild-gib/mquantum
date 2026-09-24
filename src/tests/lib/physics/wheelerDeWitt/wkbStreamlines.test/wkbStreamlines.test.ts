@@ -348,3 +348,64 @@ describe('WKB streamlines', () => {
     })
   })
 })
+
+// Regression: the a-velocity included the product-rule term (3/2)·a^{1/2}·arg χ
+// of ∇(a^{3/2}·arg χ). arg is only defined modulo 2π, so that term depended on
+// the branch cut and on χ's global phase — near a_min it rivalled the
+// a^{3/2}·∂ₐ arg term and reversed the flow. The velocity field must be
+// invariant under χ → e^{iα}χ. (Compared on the first RK4 step from each seed:
+// later steps land on the CFL cap's exact half-cell ties of the nearest-cell
+// phase lookup, where f32 rounding of the rotated χ decides the cell.)
+describe('WKB streamline flow is invariant under a global phase of χ', () => {
+  function smoothOutput(alpha: number): WheelerDeWittSolverOutput {
+    const Na = 24
+    const Nphi = 12
+    const slab = Nphi * Nphi
+    const chi = new Float32Array(2 * Na * slab)
+    for (let ia = 0; ia < Na; ia++) {
+      const a = 0.1 + 1.4 * (ia / (Na - 1))
+      for (let i1 = 0; i1 < Nphi; i1++) {
+        const phi1 = -2 + 4 * (i1 / (Nphi - 1))
+        for (let i2 = 0; i2 < Nphi; i2++) {
+          const phi2 = -2 + 4 * (i2 / (Nphi - 1))
+          const idx = ia * slab + i1 * Nphi + i2
+          // Node-free amplitude, smooth phase: the flow is well defined everywhere.
+          const amp = Math.cos((Math.PI * phi1) / 4) + 1.2
+          const theta = 6 * a + 0.4 * phi1 - 0.3 * phi2 + alpha
+          chi[2 * idx] = amp * Math.cos(theta)
+          chi[2 * idx + 1] = amp * Math.sin(theta)
+        }
+      }
+    }
+    return {
+      chi,
+      lorentzianMask: new Uint8Array(Na * slab).fill(1),
+      bandKind: new Uint8Array(Na * slab),
+      gridSize: [Na, Nphi, Nphi],
+      aMin: 0.1,
+      aMax: 1.5,
+      phiExtent: 2,
+      maxDensity: 1,
+      columnAiry: [],
+    }
+  }
+
+  it('takes the same first RK4 step from every seed for χ and e^{iα}·χ', () => {
+    const input = { density: 4, maxSteps: 2, splatRadius: 0.9 }
+    const base = integrateWkbTrajectories(smoothOutput(0), input)
+    expect(base.length).toBeGreaterThan(0)
+    for (const alpha of [1.1, 2.3, -2.9]) {
+      const phased = integrateWkbTrajectories(smoothOutput(alpha), input)
+      expect(phased.length).toBe(base.length)
+      for (let t = 0; t < base.length; t++) {
+        const a = base[t]!.points
+        const b = phased[t]!.points
+        expect(a.length).toBe(2)
+        expect(b.length).toBe(2)
+        for (let d = 0; d < 3; d++) {
+          expect(b[1]![d]! - b[0]![d]!).toBeCloseTo(a[1]![d]! - a[0]![d]!, 6)
+        }
+      }
+    }
+  })
+})

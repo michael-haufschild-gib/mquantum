@@ -13,7 +13,7 @@
  *   5 = driven (time-dependent slab barrier along axis 0)
  *   6 = doubleSlit (barrier wall along axis 0 with slit openings along axis 1)
  *   7 = periodicLattice (cosine lattice V₀cos²(πx/a) along axis 0)
- *   8 = doubleWell (radial quartic V(r) = λ(r² − a²)² − εr — bubble nucleation)
+ *   8 = doubleWell (directional quartic V(x) = λ(x² − a²)² − εx along axis 0)
  *   9 = becTrap (anisotropic harmonic trap for BEC — radial)
  *  10 = radialDoubleWell (V(r) = λ(r−r₁)²(r−r₂)² − ε·r — bubble nucleation)
  *  13 = coupledAnharmonic (V = ½Σω²x² + λΣ_{i<j} x_i²x_j² — chaotic for most λ)

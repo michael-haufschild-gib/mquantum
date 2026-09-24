@@ -50,7 +50,8 @@ export type TdseFieldView =
 /**
  * Initial condition type for the TDSE wavepacket
  * - gaussianPacket: Gaussian wavepacket exp(-|x-x0|^2/(4s^2)) * exp(i*k0.x)
- * - planeWave: Plane wave exp(i*k0.x) with Gaussian envelope
+ * - planeWave: Plane wave A·exp(i*k0.x) filling the lattice (packetWidth unused;
+ *   exact momentum eigenstate on a periodic box when k0·L = 2π·n)
  * - superposition: Sum of two Gaussian wavepackets
  */
 export type TdseInitialCondition =

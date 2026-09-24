@@ -294,6 +294,19 @@ function hasPrecessionFields(fieldA: Vec3, fieldB: Vec3): boolean {
   return hasFieldMagnitude(fieldA) || hasFieldMagnitude(fieldB)
 }
 
+/**
+ * Does precession make ρ(t) non-stationary? The trial loop always starts
+ * from |Ψ⁻⟩ or its Werner mixture, both invariant under U ⊗ U (the singlet
+ * picks up only det U, the I/4 part is trivially invariant). A common field
+ * B_A = B_B therefore leaves ρ static; treating it as time-dependent reset
+ * the accumulators every batch, so S never converged and its CI never
+ * shrank although the ensemble is stationary.
+ */
+function isNonStationaryPrecession(fieldA: Vec3, fieldB: Vec3): boolean {
+  if (!hasPrecessionFields(fieldA, fieldB)) return false
+  return fieldA[0] !== fieldB[0] || fieldA[1] !== fieldB[1] || fieldA[2] !== fieldB[2]
+}
+
 function precessionTime(config: BellPairConfig, totalTrials: number): number {
   if (!Number.isFinite(totalTrials) || totalTrials <= 0) return 0
   const trialsPerFrame = config.trialsPerFrame
@@ -561,7 +574,7 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       // first batch keeps the override seed in force).
       const fieldA = fieldVec(safeConfig.fieldA)
       const fieldB = fieldVec(safeConfig.fieldB)
-      const isPrecessing = hasPrecessionFields(fieldA, fieldB)
+      const isPrecessing = isNonStationaryPrecession(fieldA, fieldB)
       const precessionScale = isPrecessing ? safeConfig.trialsPerFrame : 0
       const configKey = `${safeConfig.aliceAxis[0]}:${safeConfig.aliceAxis[1]}:${safeConfig.aliceAxisPrime[0]}:${safeConfig.aliceAxisPrime[1]}:${safeConfig.bobAxis[0]}:${safeConfig.bobAxis[1]}:${safeConfig.bobAxisPrime[0]}:${safeConfig.bobAxisPrime[1]}:${safeConfig.visibility}:${safeConfig.detectionEfficiency}:${safeConfig.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${precessionScale}:${safeConfig.samplerMode}:${safeConfig.lhvStrategyId}`
       const configSeed = safeConfig.seed >>> 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { freeScalarNDIndexBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { pmlProfileBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pmlProfile.wgsl'
 
@@ -44,5 +45,22 @@ describe('linearToND WGSL correctness', () => {
     expect(freeScalarNDIndexBlock).toContain('firstTrailingBit(s)')
     expect(freeScalarNDIndexBlock).toContain('remaining >> logS')
     expect(freeScalarNDIndexBlock).toContain('remaining & (s - 1u)')
+  })
+})
+
+// Regression: the CPU σ_max took the weakest face over every active axis,
+// including periodic (compact / metric-wrapped) axes the shader exempts from
+// PML — a small compact axis inflated σ_max on the real faces.
+describe('computePMLSigmaMaxND periodic axes', () => {
+  it('ignores periodic axes when picking the weakest PML face', () => {
+    const open = computePMLSigmaMaxND(1e-6, 0.2, [64, 64, 64], 0.005, 3, 3)
+    const withCompactAxis = computePMLSigmaMaxND(1e-6, 0.2, [64, 64, 8], 0.005, 3, 3, 0b100)
+    const naive = computePMLSigmaMaxND(1e-6, 0.2, [64, 64, 8], 0.005, 3, 3)
+    expect(withCompactAxis).toBeCloseTo(open, 9)
+    expect(naive / open).toBeCloseTo(8, 9) // what the compact axis used to impose
+  })
+
+  it('returns 0 when every active axis is periodic (no PML anywhere)', () => {
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [32, 16], 0.005, 3, 2, 0b11)).toBe(0)
   })
 })

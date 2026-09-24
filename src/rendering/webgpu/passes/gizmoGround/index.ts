@@ -166,6 +166,11 @@ export function generateGroundEllipse(
   const semiMajor = Math.min(baseRadius / Math.max(cosAngle, 0.1), MAX_ELLIPSE_RADIUS)
   const semiMinor = Math.min(baseRadius, MAX_ELLIPSE_RADIUS)
 
+  // Local z (semi-major) must map onto the projected beam direction
+  // (sinR, cosR) = (d_x, d_z)/|·| and local x onto its perpendicular
+  // (cosR, −sinR). The previous (x, z) = (lx·cosR − lz·sinR, lx·sinR + lz·cosR)
+  // sent the major axis to (−d_x, d_z) — mirrored, so a diagonal spot drew its
+  // footprint elongated across the beam instead of along it.
   const ellipseRotation = Math.atan2(direction[0], direction[2])
   const cosR = Math.cos(ellipseRotation)
   const sinR = Math.sin(ellipseRotation)
@@ -184,12 +189,12 @@ export function generateGroundEllipse(
 
     pushLine(
       out,
-      ix + lx0 * cosR - lz0 * sinR,
+      ix + lx0 * cosR + lz0 * sinR,
       GROUND_Y + 0.01,
-      iz + lx0 * sinR + lz0 * cosR,
-      ix + lx1 * cosR - lz1 * sinR,
+      iz - lx0 * sinR + lz0 * cosR,
+      ix + lx1 * cosR + lz1 * sinR,
       GROUND_Y + 0.01,
-      iz + lx1 * sinR + lz1 * cosR,
+      iz - lx1 * sinR + lz1 * cosR,
       r,
       g,
       b,

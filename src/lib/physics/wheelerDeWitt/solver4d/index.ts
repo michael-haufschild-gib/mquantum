@@ -75,8 +75,9 @@ export function solveWheelerDeWitt4D(input: WheelerDeWittSolverInput): WheelerDe
     if (cflPhi > WDW_CFL_BUDGET) {
       WDW_CFL_WARN_BUDGET.remaining -= 1
       logger.warn(
-        `[wdw] 4D CFL margin tight: da²·(1/aMin²)·12/dphi² = ${cflPhi.toFixed(2)} ` +
-          `(budget ${WDW_CFL_BUDGET}). Current: aMin=${aMin}, aMax=${aMax}, ` +
+        `[wdw] 4D high φ-Laplacian CFL number da²·(1/aMin²)·12/dphi² = ${cflPhi.toFixed(2)} ` +
+          `(> ${WDW_CFL_BUDGET}; accuracy hint — the implicit bulk stays stable). ` +
+          `Current: aMin=${aMin}, aMax=${aMax}, ` +
           `gridNa=${gridNa}, gridNphi=${gridNphi}, phiExtent=${phiExtent}.`
       )
     }

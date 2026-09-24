@@ -183,7 +183,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
     id: 'diracOscillator',
     name: 'Dirac Oscillator',
     description:
-      'Harmonic trap for a relativistic particle — energy levels Eₙ = mc²√(1 + 2nℏω/mc²)',
+      'Electrostatic harmonic trap V = ½mω²r² on a Dirac particle — oscillates like a trapped packet, but a confining vector potential cannot truly bind it: where V − E > 2mc² the packet Klein-tunnels into negative-energy states, so the levels are quasi-bound resonances (not the Moshinsky Dirac-oscillator spectrum Eₙ = mc²√(1 + 2nℏω/mc²))',
     overrides: {
       spacing: [0.1],
       potentialType: 'harmonicTrap',

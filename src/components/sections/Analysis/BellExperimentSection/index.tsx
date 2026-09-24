@@ -25,10 +25,10 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { maxChshForWerner, WERNER_VIOLATION_THRESHOLD } from '@/lib/physics/bell/analytic'
+import { WERNER_VIOLATION_THRESHOLD } from '@/lib/physics/bell/analytic'
 import { CLASSICAL_BOUND, TSIRELSON_BOUND } from '@/lib/physics/bell/chsh'
 import { LHV_STRATEGIES } from '@/lib/physics/bell/lhv'
-import { EBERHARD_THRESHOLD, maxChshGivenEta } from '@/lib/physics/bell/loopholes'
+import { EBERHARD_THRESHOLD, maxChshForWernerGivenEta } from '@/lib/physics/bell/loopholes'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -124,7 +124,12 @@ export const BellExperimentContent: React.FC = React.memo(() => {
     storeReset(fresh)
   }, [setSeed, storeReset])
 
-  const handleRun = useCallback(() => setIsRunning(!isRunning), [isRunning, setIsRunning])
+  // Run after a completed pass (target reached) starts a fresh pass with the
+  // same seed; otherwise the loop would stop again on its first frame.
+  const handleRun = useCallback(() => {
+    if (!isRunning && totalTrials >= config.targetTrials) storeReset(config.seed)
+    setIsRunning(!isRunning)
+  }, [isRunning, setIsRunning, totalTrials, config.targetTrials, config.seed, storeReset])
 
   // ── Derived display values ──
   const qmS = Number.isFinite(qm.S) ? Math.abs(qm.S) : Number.NaN
@@ -135,10 +140,15 @@ export const BellExperimentContent: React.FC = React.memo(() => {
       ? `${qmS.toFixed(3)} ± ${ci.halfWidth.toFixed(3)}`
       : '—'
 
-  // Loophole budget: closed-form max |S| under the current (η, v).
-  const wernerCeiling = maxChshForWerner(config.visibility)
-  const etaCeiling = maxChshGivenEta(config.detectionEfficiency, config.analysisMode)
-  const combinedCeiling = Math.min(wernerCeiling, etaCeiling)
+  // Loophole budget: closed-form joint max |S| under the current (v, η).
+  // The Werner and η ceilings interact (η²·v·2√2 + 2(1−η)² when misses are
+  // assigned), so min() of the separate ceilings overstated the budget.
+  const combinedCeiling = maxChshForWernerGivenEta(
+    config.visibility,
+    config.detectionEfficiency,
+    config.analysisMode
+  )
+  const jointAllowsViolation = combinedCeiling > CLASSICAL_BOUND
   const ceilingPctOfTsirelson = (combinedCeiling / TSIRELSON_BOUND) * 100
 
   const wernerAllowsViolation = config.visibility > WERNER_VIOLATION_THRESHOLD
@@ -331,7 +341,10 @@ export const BellExperimentContent: React.FC = React.memo(() => {
           QM has not (yet) violated CHSH. Reasons that can prevent violation:{' '}
           {!wernerAllowsViolation && <span>v too low; </span>}
           {!etaAllowsViolation && <span>η too low without fair-sampling; </span>}
-          {wernerAllowsViolation && etaAllowsViolation && totalTrials < 20_000 && (
+          {wernerAllowsViolation && etaAllowsViolation && !jointAllowsViolation && (
+            <span>v and η jointly cap |S| at {combinedCeiling.toFixed(3)} ≤ 2; </span>
+          )}
+          {jointAllowsViolation && totalTrials < 20_000 && (
             <span>not enough trials for the |S| estimate to escape noise.</span>
           )}
         </p>

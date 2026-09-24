@@ -76,6 +76,20 @@ describe('CollapsedView', () => {
     expect(screen.getByText('45')).toBeInTheDocument()
   })
 
+  it('keeps the status dot size when the FPS color level changes', () => {
+    usePerformanceMetricsStore.setState({ fps: 60, frameTime: 16.7 })
+    render(<CollapsedView />)
+    const dot = screen.getByTestId('fps-status-dot')
+    expect(dot).toHaveClass('h-1.5', 'w-1.5', 'bg-health-high')
+
+    act(() => {
+      usePerformanceMetricsStore.setState({ fps: 15, frameTime: 66.7 })
+    })
+
+    expect(dot).toHaveClass('h-1.5', 'w-1.5', 'bg-health-low')
+    expect(dot).not.toHaveClass('h-2.5')
+  })
+
   it('applies health-high class for high FPS (≥50)', () => {
     usePerformanceMetricsStore.setState({ fps: 60 })
     render(<CollapsedView />)

@@ -42,6 +42,7 @@ import {
   nestedClampedSetter,
   nestedIntSetter,
   type SetterContext,
+  sharedPmlClampedSetter,
 } from './sliceSetterUtils'
 
 /** Default fall-back throat radius b₀ when none is otherwise available. */
@@ -293,7 +294,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
         },
       }))
     },
-    setTdsePmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
+    setTdsePmlTargetReflection: sharedPmlClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
     setTdseFieldView: (view: TdseFieldView) => {
       if (!isTdseFieldView(view)) return
       ctx.setWithVersion((state) => ({

@@ -170,6 +170,26 @@ describe('processTrialBatch — precession fields', () => {
     expect(Math.abs(s.qm.S)).toBeGreaterThan(TSIRELSON_BOUND - 0.15)
   })
 
+  // Regression: a common field B_A = B_B leaves the singlet / Werner state
+  // invariant, yet every batch reset the accumulators, so S never converged.
+  it('accumulates across batches under a common field (stationary state)', () => {
+    const field = [0.3, -0.2, 0.9] as [number, number, number]
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      fieldA: field,
+      fieldB: [...field] as [number, number, number],
+      trialsPerFrame: 20_000,
+    }
+    useBellExperimentStore.getState().reset(7)
+    for (let k = 0; k < 3; k++) {
+      useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+    }
+    const s = useBellExperimentStore.getState()
+    const binTotal = s.qm.bins.reduce((acc, b) => acc + b.count, 0)
+    expect(binTotal).toBe(60_000)
+    expect(Math.abs(s.qm.S)).toBeGreaterThan(TSIRELSON_BOUND - 0.08)
+  })
+
   it('changing trialsPerFrame resets precessing ensembles because it changes physics time', () => {
     const cfg = {
       ...createDefaultBellPairConfig(),

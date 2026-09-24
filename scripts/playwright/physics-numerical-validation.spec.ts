@@ -24,6 +24,7 @@ import { expect, test } from './fixtures'
 import {
   applyBecPreset,
   gotoMode,
+  pauseAnimation,
   readBecDiagnostics,
   readDensityDiagnostics,
   readFsfDiagnostics,
@@ -36,6 +37,7 @@ import {
   setupAndWaitForDensity,
   waitForDiagnostics,
   waitForFreshReadback,
+  waitForPageCondition,
   waitForShaderCompilation,
   waitForSimulationFrames,
 } from './helpers/app-helpers'
@@ -184,7 +186,9 @@ test.describe('hydrogen orbital density structure', () => {
 
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 4, 3, 0)
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'density')
+    // hasData is already true from the default orbital, so waiting on it read
+    // the pre-change density (max 3.19 = the default state's peak).
+    await resetAndWaitForDensityDiagnostics(page)
     const diag = await readDensityDiagnostics(page)
     expect(diag.hasData).toBe(true)
 
@@ -503,7 +507,8 @@ test.describe('TDSE observables physics', () => {
     })
 
     // Wait for observables diagnostic data
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
@@ -551,7 +556,8 @@ test.describe('TDSE observables physics', () => {
     })
 
     // Read initial position
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
@@ -561,15 +567,30 @@ test.describe('TDSE observables physics', () => {
     const obs0 = await readObservablesDiagnostics(page)
     const x0 = obs0.positionMean[0]!
 
-    // Let the packet propagate
-    await waitForSimulationFrames(page, 200)
-
+    // Sample the FIRST displaced readback. The lattice is periodic (absorber
+    // off) with half-width N·dx/2 = 3.2, and the packet moves at p/m = 5 per
+    // unit time: after ~200 frames (t ≈ 4 at dt·stepsPerFrame = 0.02) it has
+    // wrapped ~3 times and dispersed over the whole box (σ(4) ≈ 6.7), so ⟨x⟩ ≈ 0
+    // whatever the momentum sign — sampling there made this test fail on a
+    // correct integrator.
+    let x1 = x0
+    await expect
+      .poll(
+        async () => {
+          x1 = (await readObservablesDiagnostics(page)).positionMean[0]!
+          return Math.abs(x1 - x0)
+        },
+        { timeout: 30_000, intervals: [16] }
+      )
+      .toBeGreaterThan(0.02)
     const obs1 = await readObservablesDiagnostics(page)
-    const x1 = obs1.positionMean[0]!
 
-    // <x> should have moved in the +x direction (p₀ = +5.0)
-    // The exact displacement depends on dt and frame count, but it must be positive.
+    // <x> should have moved in the +x direction (p₀ = +5.0), still inside the box.
     expect(x1, `<x> must increase: x0=${x0.toFixed(4)}, x1=${x1.toFixed(4)}`).toBeGreaterThan(x0)
+    expect(x1).toBeLessThan(3.0)
+    // Free evolution conserves <p> = ħk₀ = 5 (Ehrenfest: d<p>/dt = 0 for V = 0).
+    expect(obs1.momentumMean[0]!).toBeGreaterThan(4.5)
+    expect(obs1.momentumMean[0]!).toBeLessThan(5.5)
 
     // Transverse dimensions should not have systematic drift
     // (no transverse momentum → <y>, <z> stay near 0)
@@ -620,7 +641,8 @@ test.describe('quantum walk norm conservation', () => {
     })
 
     // Wait for QW diagnostics to appear
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
@@ -660,7 +682,8 @@ test.describe('quantum walk norm conservation', () => {
       s.resetQuantumWalk()
     })
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
@@ -704,7 +727,8 @@ test.describe('quantum walk norm conservation', () => {
       })
     })
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
@@ -724,9 +748,11 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.evaluate(async () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const store = mod.useExtendedObjectStore.getState()
-      const s = store as Record<string, (...a: unknown[]) => void>
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(false)
+      // Re-read AFTER the setter: spreading a snapshot taken before it
+      // restored the shared absorberEnabled = true and re-enabled the PML.
+      const store = mod.useExtendedObjectStore.getState()
       mod.useExtendedObjectStore.setState({
         schroedinger: {
           ...store.schroedinger,
@@ -739,7 +765,8 @@ test.describe('quantum walk norm conservation', () => {
       })
     })
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
@@ -767,7 +794,8 @@ test.describe('quantum walk norm conservation', () => {
     })
 
     // Wait for initial diagnostics
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
@@ -837,45 +865,56 @@ test.describe('BEC physics — strong validation', () => {
   })
 
   test('increasing g increases chemical potential', async ({ page }) => {
+    // The μ readout is g·n_peak of the *evolving* state. The Thomas-Fermi seed
+    // is not stationary on this lattice (ξ ≈ 0.28 vs dx = 0.15): its peak
+    // oscillates by up to ~2.4× (a CPU split-step reference reproduces the GPU
+    // trace), so comparing two readouts taken at arbitrary times was a coin
+    // flip. Instead check the freshly seeded state against the analytic 3D TF
+    // chemical potential μ = (15·g·Γ(3/2) / (2^{7/2}·π^{3/2}))^{2/5} (ω = m = ħ = 1),
+    // which is strictly increasing in g.
+    const muTF = (g: number) =>
+      Math.pow(
+        (15 * g * 0.5 * Math.sqrt(Math.PI)) / (Math.pow(2, 3.5) * Math.pow(Math.PI, 1.5)),
+        0.4
+      )
+
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
 
-    // g = 200 (low)
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
-      s.setBecInteractionStrength(200)
-      s.setBecInitialCondition('thomasFermi')
-      s.resetBecField()
-    })
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
-    await waitForSimulationFrames(page, 120)
-    const diagLow = await readBecDiagnostics(page)
+    const seededMu = async (g: number): Promise<number> => {
+      await page.evaluate(async (gv) => {
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+        const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+        s.setBecInteractionStrength(gv)
+        s.setBecInitialCondition('thomasFermi')
+        s.resetBecField()
+      }, g)
+      await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
+      let mu = Number.NaN
+      await expect
+        .poll(
+          async () => {
+            mu = (await readBecDiagnostics(page)).chemicalPotential
+            return Math.abs(mu - muTF(g)) / muTF(g)
+          },
+          { timeout: 30_000, intervals: [16] }
+        )
+        .toBeLessThan(0.05)
+      return mu
+    }
 
-    // g = 1000 (high)
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
-      s.setBecInteractionStrength(1000)
-      s.resetBecField()
-    })
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
-    await waitForSimulationFrames(page, 120)
-    const diagHigh = await readBecDiagnostics(page)
-
-    expect(diagLow.hasData).toBe(true)
-    expect(diagHigh.hasData).toBe(true)
-    // μ = g * n_peak. Higher g → higher μ (assuming similar density profile)
-    expect(
-      diagHigh.chemicalPotential,
-      `μ(g=1000)=${diagHigh.chemicalPotential} should be > μ(g=200)=${diagLow.chemicalPotential}`
-    ).toBeGreaterThan(diagLow.chemicalPotential)
+    const muLow = await seededMu(200)
+    const muHigh = await seededMu(1000)
+    expect(muHigh, `μ(g=1000)=${muHigh} should be > μ(g=200)=${muLow}`).toBeGreaterThan(muLow)
   })
 
-  test('attractive BEC (g < 0): norm drops rapidly (collapse)', async ({ page }) => {
-    // Negative g causes the BEC to collapse — |ψ|² concentrates
-    // and eventually the integrator can't handle the singularity.
-    // Norm should drop or blow up, not stay stable.
+  test('attractive BEC (g < 0): density focuses (collapse), norm conserved', async ({ page }) => {
+    // Negative g causes the BEC to collapse — |ψ|² concentrates. The Strang
+    // split-step GPE is exactly norm-preserving (the nonlinear step is a pure
+    // |ψ|²-dependent phase), so collapse shows up as density focusing, not as
+    // norm loss: the old "norm drift > 5 % or maxDensity > 5" criterion failed
+    // on a correct integrator (GPU-observed: drift ~1e-7, peak 0.066 → ~2.4,
+    // capped by the dx = 0.15 grid).
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
 
@@ -888,22 +927,30 @@ test.describe('BEC physics — strong validation', () => {
       s.resetBecField()
     })
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
-    await waitForSimulationFrames(page, 200)
+
+    // g = −500 is ~70× past the 3D critical coupling (|g| ≈ 4π·0.575 at unit
+    // norm), so the seeded unit-norm Gaussian (peak (2π)^{-3/2} ≈ 0.063) must
+    // focus by more than 10× — a broken or sign-flipped nonlinear term
+    // disperses it instead.
+    const initialPeak = Math.pow(2 * Math.PI, -1.5)
+    await expect
+      .poll(async () => (await readBecDiagnostics(page)).maxDensity, { timeout: 30_000 })
+      .toBeGreaterThan(10 * initialPeak)
 
     const diag = await readBecDiagnostics(page)
     expect(diag.hasData).toBe(true)
-    // Attractive BEC should show significant instability — norm drift > 5%
-    // or maxDensity should be much larger than for repulsive case.
-    // If norm is perfectly stable with g<0, the nonlinear term is broken.
-    expect(
-      Math.abs(diag.normDrift) > 0.05 || diag.maxDensity > 5,
-      `attractive BEC should show instability: normDrift=${diag.normDrift}, maxDensity=${diag.maxDensity}`
-    ).toBe(true)
+    expect(Math.abs(diag.normDrift), `normDrift=${diag.normDrift}`).toBeLessThan(1e-3)
   })
 
-  test('TF ground state: center density via density oracle', async ({ page }) => {
-    // TF profile has maximum at the center, zero at the boundary.
-    await setupAndWaitForDensity(page, 'becDynamics', 3)
+  test('TF ground state: density peaks at the trap center (slice oracle)', async ({ page }) => {
+    // BEC is a compute mode: the analytic density-grid oracle (the `density`
+    // diagnostics channel) never runs for it, so the previous version waited
+    // for that channel forever. Capture an x-slice of |ψ|² through the lattice
+    // center instead (TdseBecStrategy → extractCenteredDensitySlice). The TF
+    // profile n = (μ − V)/g peaks at the center and vanishes past
+    // R_TF = √(2μ) ≈ 3.6 (g = 500, ω = m = 1), inside the 4.8 half-box.
+    await gotoMode(page, 'becDynamics', 3)
+    await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
@@ -912,13 +959,39 @@ test.describe('BEC physics — strong validation', () => {
       s.setBecInitialCondition('thomasFermi')
       s.resetBecField()
     })
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'density')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
+    await pauseAnimation(page)
 
-    const diag = await readDensityDiagnostics(page)
-    expect(diag.hasData).toBe(true)
-    // Center density should be near the peak (TF profile peaks at center)
-    expect(diag.centerDensity, 'center > 0 for TF profile').toBeGreaterThan(0)
-    expect(diag.maxDensity, 'maxDensity > 0').toBeGreaterThan(0)
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/diagnostics/wavefunctionSliceStore.ts')
+      mod.useWavefunctionSliceStore.getState().requestCapture('x', 'becDynamics')
+    })
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async () => {
+            const mod = await import('/src/stores/diagnostics/wavefunctionSliceStore.ts')
+            const st = mod.useWavefunctionSliceStore.getState()
+            return st.hasData && st.sliceSourceMode === 'becDynamics'
+          }),
+        { timeout: 30_000 }
+      )
+      .toBe(true)
+    const slice = await page.evaluate(async () => {
+      const mod = await import('/src/stores/diagnostics/wavefunctionSliceStore.ts')
+      const st = mod.useWavefunctionSliceStore.getState()
+      return { data: Array.from(st.sliceData ?? []), bound: st.sliceWorldBound }
+    })
+
+    const n = slice.data.length
+    expect(n).toBe(64)
+    const peak = Math.max(...slice.data)
+    const argmax = slice.data.indexOf(peak)
+    const xAt = (i: number) => -slice.bound + ((i + 0.5) * 2 * slice.bound) / n
+    expect(peak, 'TF peak density > 0').toBeGreaterThan(0)
+    expect(Math.abs(xAt(argmax)), 'peak sits at the trap center').toBeLessThan(0.5)
+    expect(slice.data[0]!, 'edge density ≪ peak (outside R_TF)').toBeLessThan(0.05 * peak)
+    expect(slice.data[n - 1]!, 'edge density ≪ peak (outside R_TF)').toBeLessThan(0.05 * peak)
   })
 
   test('TF ground state: healing length physically consistent with μ', async ({ page }) => {
@@ -977,7 +1050,10 @@ test.describe('FSF physics — strong validation', () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
-      s.setFreeScalarInitialCondition('vacuum')
+      // 'vacuumNoise' is the vacuum IC ('vacuum' is rejected by the setter);
+      // FSF diagnostics default to off, so no readback ever arrived.
+      s.setFreeScalarInitialCondition('vacuumNoise')
+      s.setFreeScalarDiagnosticsEnabled(true)
       s.resetFreeScalarField()
     })
     await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
@@ -999,7 +1075,10 @@ test.describe('FSF physics — strong validation', () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
-      s.setFreeScalarInitialCondition('vacuum')
+      // 'vacuumNoise' is the vacuum IC ('vacuum' is rejected by the setter);
+      // FSF diagnostics default to off, so no readback ever arrived.
+      s.setFreeScalarInitialCondition('vacuumNoise')
+      s.setFreeScalarDiagnosticsEnabled(true)
       s.resetFreeScalarField()
     })
     await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
@@ -1023,6 +1102,8 @@ test.describe('FSF physics — strong validation', () => {
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
       s.setFreeScalarInitialCondition('gaussianPacket')
+      // FSF diagnostics default to off; without this no readback ever arrives.
+      s.setFreeScalarDiagnosticsEnabled(true)
       s.resetFreeScalarField()
     })
     await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
@@ -1057,6 +1138,10 @@ test.describe('FSF physics — strong validation', () => {
   test('conjugate momentum stays bounded: maxPi finite after 200 frames', async ({ page }) => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
+    // FSF diagnostics default to off; enable them or the fsf channel never fills.
+    await page.evaluate(() =>
+      window.__EXTENDED_OBJECT_STORE__!.getState().setFreeScalarDiagnosticsEnabled(true)
+    )
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
@@ -1069,6 +1154,10 @@ test.describe('FSF physics — strong validation', () => {
   test('field norm stays finite and positive over 200 frames', async ({ page }) => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
+    // FSF diagnostics default to off; enable them or the fsf channel never fills.
+    await page.evaluate(() =>
+      window.__EXTENDED_OBJECT_STORE__!.getState().setFreeScalarDiagnosticsEnabled(true)
+    )
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 

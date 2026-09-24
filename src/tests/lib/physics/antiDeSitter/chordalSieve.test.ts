@@ -58,7 +58,7 @@ describe('busemannClock', () => {
 describe('computeAdsChordalSieveScalar', () => {
   const base = {
     point: { x: 0.31, y: -0.22, z: 0.18 },
-    densityNorm: 0.85,
+    density: 0.85,
     n: 2,
     l: 1,
     m: 0.45,
@@ -77,7 +77,7 @@ describe('computeAdsChordalSieveScalar', () => {
     expect(
       computeAdsChordalSieveScalar({
         ...base,
-        densityNorm: 0,
+        density: 0,
       })
     ).toBe(0)
   })
@@ -91,9 +91,9 @@ describe('computeAdsChordalSieveScalar', () => {
       scaled(boundaryAnchorForAds(0.9), 0.94),
     ]
     const controls = [
-      { densityNorm: 0.25, n: 0, l: 0, m: 0, frequency: 0, twist: 0 },
-      { densityNorm: 1, n: 1, l: 2, m: 0.7, frequency: 2.5, twist: -0.8 },
-      { densityNorm: 3, n: 4, l: -3, m: -1.2, frequency: 9, twist: 1.7 },
+      { density: 0.25, n: 0, l: 0, m: 0, frequency: 0, twist: 0 },
+      { density: 1, n: 1, l: 2, m: 0.7, frequency: 2.5, twist: -0.8 },
+      { density: 3, n: 4, l: -3, m: -1.2, frequency: 9, twist: 1.7 },
     ]
 
     for (const point of points) {
@@ -119,6 +119,15 @@ describe('computeAdsChordalSieveScalar', () => {
     })
 
     expect(Math.abs(highFrequency - lowFrequency)).toBeGreaterThan(0.02)
+  })
+
+  it('mirrors the shader density gate 1 − exp(−10·|ψ|²)', () => {
+    // Regression: the mirror multiplied by the density directly, so these
+    // tests exercised a different transfer function than antiDeSitter.wgsl.
+    const weak = computeAdsChordalSieveScalar({ ...base, density: 0.01 })
+    const strong = computeAdsChordalSieveScalar({ ...base, density: 1 })
+    const gateRatio = (1 - Math.exp(-0.1)) / (1 - Math.exp(-10))
+    expect(weak / strong).toBeCloseTo(gateRatio, 10)
   })
 
   it('twist changes phase contrast at the same point', () => {

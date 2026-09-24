@@ -24,6 +24,7 @@ import {
   readTdseDiagnostics,
   requireWebGPU,
   waitForFirstFrame,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -84,7 +85,8 @@ async function applyDecoherencePreset(page: import('@playwright/test').Page, pre
 
 /** Wait for TDSE diagnostics store to have data. */
 async function waitForDiagData(page: import('@playwright/test').Page) {
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.hasData
@@ -237,7 +239,11 @@ test.describe('decoherence — diagnostics', () => {
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
 
-    // γ=0 means stochastic dispatch is skipped — should be identical to vanilla TDSE
+    // γ=0 means stochastic dispatch is skipped — should be identical to vanilla
+    // TDSE. Reset after configuring: the default scene runs with the PML
+    // absorber on, so without a reset the probability it had already absorbed
+    // read as a "broken" norm. The TDSE packet is not unit-normalised (its norm
+    // is (2πσ²)^{3/2} ≈ 0.425 at σ = 0.3), so assert the drift, not |ψ|² = 1.
     await page.evaluate(async () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
@@ -246,59 +252,75 @@ test.describe('decoherence — diagnostics', () => {
       s.setTdseBranchingEnabled(true)
       s.setTdseDiagnosticsEnabled(true)
       s.setTdseAbsorberEnabled(false)
+      s.resetTdseField()
     })
     await waitForSimulationFrames(page, 60)
     await waitForDiagData(page)
 
     const diag = await readTdseDiagnostics(page)
-    // At γ=0 the norm should be essentially unperturbed
-    expect(diag.totalNorm, 'norm near 1 at γ=0').toBeGreaterThan(0.95)
-    expect(diag.totalNorm, 'norm not diverged').toBeLessThan(1.05)
+    expect(diag.totalNorm, 'norm finite and positive').toBeGreaterThan(0)
+    expect(Math.abs(diag.normDrift), `normDrift=${diag.normDrift} at γ=0`).toBeLessThan(0.01)
   })
 
-  test('strong monitoring (γ=5) reduces IPR vs baseline', async ({ page }) => {
-    await gotoMode(page, 'tdseDynamics', 3)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-    await waitForFirstFrame(page)
+  test('strong monitoring (γ=10) keeps the packet more localized than unitary spreading', async ({
+    page,
+  }) => {
+    // Participation ratio IPR = (Σ|ψ|²)²/Σ|ψ|⁴ counts occupied sites. Free
+    // unitary evolution spreads the packet (IPR ~1.6·10³ → ~1.6·10⁵ by t ≈ 1.2);
+    // strong CSL monitoring keeps collapsing it (~4–6·10⁴ over the same window).
+    // Both runs start from a reset and are compared over the same sim-time
+    // window, before the periodic box re-interferes (t ≳ 1.2); the old test
+    // compared an un-reset baseline and a reset run at unrelated times.
+    const meanIprOverWindow = async (gamma: number): Promise<{ ipr: number; norm: number }> => {
+      await gotoMode(page, 'tdseDynamics', 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+      await waitForFirstFrame(page)
+      await page.evaluate(async (g) => {
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+        const s = mod.useExtendedObjectStore.getState()
+        s.setTdsePotentialType('free')
+        s.setTdseAbsorberEnabled(false)
+        s.setTdseDiagnosticsEnabled(true)
+        s.setTdseStochasticEnabled(g > 0)
+        s.setTdseStochasticGamma(g)
+        s.setTdseStochasticSigma(0.5)
+        s.setTdseStochasticNumSites(32)
+        s.setTdseStochasticSeed(42)
+        s.resetTdseField()
+      }, gamma)
+      const samples = new Map<number, number>()
+      let norm = Number.NaN
+      await expect
+        .poll(
+          async () => {
+            const d = await readTdseDiagnostics(page)
+            if (d.hasData && d.simTime >= 0.6 && d.simTime <= 1.2) {
+              samples.set(d.simTime, d.ipr)
+              norm = d.totalNorm
+            }
+            return d.simTime
+          },
+          { timeout: 60_000, intervals: [16] }
+        )
+        .toBeGreaterThan(1.2)
+      expect(samples.size, `γ=${gamma}: samples in window`).toBeGreaterThanOrEqual(3)
+      const values = [...samples.values()]
+      return { ipr: values.reduce((a, b) => a + b, 0) / values.length, norm }
+    }
 
-    // Baseline: no decoherence, free potential
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const s = mod.useExtendedObjectStore.getState()
-      s.setTdsePotentialType('free')
-      s.setTdseAbsorberEnabled(false)
-      s.setTdseDiagnosticsEnabled(true)
-    })
-    await waitForSimulationFrames(page, 90)
-    await waitForDiagData(page)
-    const baseline = await readTdseDiagnostics(page)
-
-    // Strong decoherence run
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const s = mod.useExtendedObjectStore.getState()
-      s.setTdseStochasticEnabled(true)
-      s.setTdseStochasticGamma(5.0)
-      s.setTdseStochasticSigma(1.0)
-      s.setTdseStochasticNumSites(8)
-      s.setTdseStochasticSeed(42)
-      s.resetTdseField()
-    })
-    // Reset diagnostics store for fresh data
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
-      mod.useDiagnosticsStore.getState().resetTdse()
-    })
-    await waitForSimulationFrames(page, 180)
-    await waitForDiagData(page)
-    const decoherent = await readTdseDiagnostics(page)
-
-    // IPR under strong monitoring should be lower (more localized)
+    const unitary = await meanIprOverWindow(0)
+    const monitored = await meanIprOverWindow(10)
     expect(
-      decoherent.ipr,
-      `IPR(γ=5)=${decoherent.ipr.toFixed(1)} < baseline=${baseline.ipr.toFixed(1)}`
-    ).toBeLessThan(baseline.ipr)
+      monitored.ipr,
+      `mean IPR γ=10 (${monitored.ipr.toFixed(0)}) < 0.8 × unitary (${unitary.ipr.toFixed(0)})`
+    ).toBeLessThan(0.8 * unitary.ipr)
+    // Renormalization must hold CSL at the seeded norm, not at the value
+    // latched after the first un-renormalised kicks (+2.4 % at γ = 10).
+    expect(
+      Math.abs(monitored.norm - unitary.norm) / unitary.norm,
+      `norm γ=10 ${monitored.norm} vs γ=0 ${unitary.norm}`
+    ).toBeLessThan(0.005)
   })
 
   test('extended evolution remains stable (no NaN/Inf)', async ({ page }) => {
@@ -375,7 +397,8 @@ test.describe('decoherence — monitoring sweep', () => {
     })
 
     // Wait for completion
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/monitoringSweepStore.ts')
         return mod.useMonitoringSweepStore.getState().status === 'complete'

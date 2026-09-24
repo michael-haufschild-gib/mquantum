@@ -375,12 +375,30 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     phiVal = envelope * cos(phase);
     piVal = (omega / safeAKinetic) * envelope * sin(phase);
   } else if (params.initCondition == 3u) {
-    // Kink profile: phi = v * tanh((x0 - center0) / width), pi = 0
-    // Domain wall interpolating between -v and +v along axis 0
+    // Kink: the static domain wall of the pi-update force along axis 0,
+    //   aPotential·φ'' = aFull·(m²·s·φ + 4λφ(φ² − v²)) = aFull·4λφ(φ² − v_eff²),
+    //   v_eff² = v² − m²·s / (4λ),
+    // is φ = v_eff·tanh((x0 − c0)/w) with w² = aPotential / (2λ·v_eff²·aFull),
+    // π = 0. Any other width starts off-equilibrium, so the wall breathes and
+    // sheds radiation instead of sitting static (the UI hides the width slider
+    // for this condition, so packetWidth was a stale hidden parameter). With no
+    // usable double well (self-interaction off, λ ≤ 0, v_eff² ≤ 0) keep the
+    // legacy v·tanh(dx / packetWidth) profile.
     let v = params.selfInteractionVev;
     let dx = worldPos[0] - params.packetCenter[0];
-    let w = select(params.packetWidth, 0.3, params.packetWidth <= 0.0);
-    phiVal = v * tanh(dx / w);
+    var kinkAmp = v;
+    var w = select(params.packetWidth, 0.3, params.packetWidth <= 0.0);
+    let lambda = params.selfInteractionLambda;
+    if (params.selfInteractionEnabled != 0u && lambda > 0.0) {
+      let vEff2 = v * v - params.mass * params.mass * params.massSquaredScale / (4.0 * lambda);
+      if (vEff2 > 0.0) {
+        let aPot = max(params.aPotential, 1e-20);
+        let aFull = max(params.aFull, 1e-20);
+        kinkAmp = sign(v) * sqrt(vEff2);
+        w = sqrt(aPot / (2.0 * lambda * vEff2 * aFull));
+      }
+    }
+    phiVal = kinkAmp * tanh(dx / w);
     piVal = 0.0;
   } else if (params.initCondition == 4u) {
     let caustic = computeRetrocausalCaustic(worldPos);

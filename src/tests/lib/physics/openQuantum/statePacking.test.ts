@@ -217,3 +217,29 @@ describe('unpackFromGPU', () => {
     )
   })
 })
+
+// Regression: the trim tested populations only, so a trailing state at
+// ρ_kk ≤ 0.01 was dropped together with coherences up to √(ρ_00 ρ_kk) ≈ 0.1
+// (an interference term worth ~20 % of the density), which then vanished
+// abruptly as relaxation pushed ρ_kk under the threshold.
+describe('computeActiveK keeps states that still carry coherence', () => {
+  it('keeps a weakly populated state whose coherence is above threshold', () => {
+    const K = 3
+    const coeffs = [Math.sqrt(0.991), 0, Math.sqrt(0.009)]
+    const elements = new Float64Array(K * K * 2)
+    for (let k = 0; k < K; k++) {
+      for (let l = 0; l < K; l++) elements[2 * (k * K + l)] = coeffs[k]! * coeffs[l]!
+    }
+    expect(computeActiveK({ K, elements })).toBe(3)
+  })
+
+  it('still trims a state whose population and coherences are both negligible', () => {
+    const K = 3
+    const elements = new Float64Array(K * K * 2)
+    elements[0] = 0.9999
+    elements[2 * (2 * K + 2)] = 1e-6
+    elements[2 * (0 * K + 2)] = 5e-3
+    elements[2 * (2 * K + 0)] = 5e-3
+    expect(computeActiveK({ K, elements })).toBe(2)
+  })
+})

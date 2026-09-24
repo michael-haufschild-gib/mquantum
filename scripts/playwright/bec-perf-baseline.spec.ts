@@ -18,6 +18,7 @@ import {
   gotoMode,
   requireWebGPU,
   waitForFrameAdvance,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -106,7 +107,8 @@ test.describe('BEC performance baseline', () => {
       await waitForSimulationFrames(page, SIM_WARMUP_FRAMES)
 
       // Let perf metrics update
-      await page.waitForFunction(
+      await waitForPageCondition(
+        page,
         async () => {
           const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
           return mod.usePerformanceMetricsStore.getState().fps > 0
@@ -117,7 +119,8 @@ test.describe('BEC performance baseline', () => {
       // Measurement window
       const measureStart = await getFrameCount(page)
       await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
-      await page.waitForFunction(
+      await waitForPageCondition(
+        page,
         async () => {
           const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
           return mod.usePerformanceMetricsStore.getState().fps > 0

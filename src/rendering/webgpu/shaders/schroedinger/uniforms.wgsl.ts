@@ -631,7 +631,7 @@ struct OpenQuantumUniforms {
   vonNeumannEntropy: f32,
   /** Σ_{k≠l} |ρ_{kl}| — off-diagonal coherence */
   coherenceMagnitude: f32,
-  /** Re(ρ_{00}) — ground state population */
+  /** Re(ρ_{gg}) — population of the lowest-energy basis state g */
   groundPopulation: f32,
   /** Active basis size (1-14), written as f32 from CPU packForGPU */
   maxK: f32,

@@ -909,3 +909,80 @@ describe('prePackTdseFrameSnapshots', () => {
     expect(snapshots[2]![I.harmonicOmega]).toBeCloseTo(2)
   })
 })
+
+describe('wormhole trig cache under imaginary time', () => {
+  function packWormhole(imaginaryTimeEnabled: boolean): Float32Array {
+    const uniformData = new ArrayBuffer(TDSE_UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          dt: 0.02,
+          wormholeCouplingEnabled: true,
+          wormholeCouplingG: 2,
+          imaginaryTimeEnabled,
+        }),
+      })
+    )
+    return f32
+  }
+
+  it('writes cos/sin of 0.5·dt·g in real time', () => {
+    const f32 = packWormhole(false)
+    expect(f32[I.wormholeCosTau]).toBeCloseTo(Math.cos(0.02), 6)
+    expect(f32[I.wormholeSinTau]).toBeCloseTo(Math.sin(0.02), 6)
+  })
+
+  it('writes cosh/sinh of 0.5·dt·g for the Wick-rotated kick', () => {
+    const f32 = packWormhole(true)
+    expect(f32[I.wormholeCosTau]).toBeCloseTo(Math.cosh(0.02), 6)
+    expect(f32[I.wormholeSinTau]).toBeCloseTo(Math.sinh(0.02), 6)
+  })
+
+  it('emits the real cosh/sinh mixing branch in the kernel', async () => {
+    const { tdseWormholeCoupleBlock } =
+      await import('@/rendering/webgpu/shaders/schroedinger/compute/tdseWormholeCouple.wgsl')
+    expect(tdseWormholeCoupleBlock).toContain('if (params.imaginaryTime != 0u) {')
+    expect(tdseWormholeCoupleBlock).toContain('outV = c * zV - s * zVP;')
+    expect(tdseWormholeCoupleBlock).toContain('outVP = c * zVP - s * zV;')
+  })
+})
+
+// Regression: a small Kaluza-Klein compact axis (no PML faces) set the σ_max
+// "weakest face", inflating the absorber on every real face by N_open/N_compact.
+describe('writeTdseUniforms σ_max with a compact axis', () => {
+  function sigmaFor(overrides: Partial<TdseConfig>): number {
+    const uniformData = new ArrayBuffer(TDSE_UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ absorberEnabled: true, absorberWidth: 0.2, ...overrides }),
+      })
+    )
+    return f32[I.absorberStrength]!
+  }
+
+  it('takes the weakest face over the open axes only', () => {
+    const open = sigmaFor({ gridSize: [64, 64, 64] })
+    const compact = sigmaFor({
+      gridSize: [64, 64, 8],
+      compactDims: [false, false, true],
+      compactRadii: [1, 1, 0.2],
+    })
+    expect(compact).toBeCloseTo(open, 3)
+  })
+})

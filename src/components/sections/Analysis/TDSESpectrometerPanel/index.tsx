@@ -320,8 +320,9 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
               className="rounded-md border border-border-default bg-[var(--bg-surface)] px-2 py-1 text-xs text-text-secondary leading-snug"
               data-testid="heller-time-dependent-notice"
             >
-              The drive is armed, so H depends on time. Heller&apos;s theorem needs a stationary
-              Hamiltonian — capture is paused until you turn the drive off in the TDSE controls.
+              H depends on time (an armed drive, or an expanding de Sitter metric). Heller&apos;s
+              theorem needs a stationary Hamiltonian — capture is paused until you turn the drive
+              off or set the Hubble rate to 0 in the TDSE controls.
             </div>
           )}
 

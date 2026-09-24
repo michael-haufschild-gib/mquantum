@@ -74,16 +74,51 @@ function hydrogenRadialNormND_f32(nr: number, lambda: number, nEff: number, a0: 
 function hypersphericalLayerNorm_f32(lk: number, lkp1: number, D: number, k: number): number {
   const nk = lk - lkp1
   if (nk < 0) return f(Math.exp(f(-20)))
-  const dMinusKMinus1 = D - k - 1
-  const prefactor = f(2 * lk + dMinusKMinus1)
+  const twoAlpha = 2 * lkp1 + D - k - 2
   const lnNkFact = lnFactorial_f32(nk)
-  const lnGammaNum = lnGammaHalf_f32(2 * lkp1 + dMinusKMinus1)
-  const lnGammaDen = lnGammaHalf_f32(2 * lk + dMinusKMinus1 + 2)
-  const lnNormSq = f(
-    f(f(f(Math.log(f(Math.max(prefactor, f(1e-20))))) + lnNkFact) + lnGammaNum) -
-      f(f(0.6931472) + lnGammaDen)
-  )
+  const lnGammaNPlus2Alpha = lnFactorial_f32(nk + twoAlpha - 1)
+  const lnGammaAlpha = lnGammaHalf_f32(twoAlpha)
+  const nPlusAlpha = f(f(0.5) * f(2 * nk + twoAlpha))
+  // WGSL evaluates the sum left to right.
+  let lnNormSq = f(lnNkFact + f(Math.log(f(Math.max(nPlusAlpha, f(1e-20))))))
+  lnNormSq = f(lnNormSq + f(f(2) * lnGammaAlpha))
+  lnNormSq = f(lnNormSq + f(f(twoAlpha - 1) * f(0.6931472)))
+  lnNormSq = f(lnNormSq - f(1.1447299))
+  lnNormSq = f(lnNormSq - lnGammaNPlus2Alpha)
   return f(Math.exp(f(lnNormSq * f(0.5))))
+}
+
+/** Gegenbauer C_n^α(x) via the same three-term recurrence as the WGSL `gegenbauer`. */
+function gegenbauer(n: number, alpha: number, x: number): number {
+  if (n === 0) return 1
+  let cNm2 = 1
+  let cNm1 = 2 * alpha * x
+  for (let i = 2; i <= n; i++) {
+    const cN = ((2 * (i + alpha - 1)) / i) * x * cNm1 - ((i + 2 * alpha - 2) / i) * cNm2
+    cNm2 = cNm1
+    cNm1 = cN
+  }
+  return cNm1
+}
+
+/**
+ * ∫₀^π [N · sin^{l_{k+1}}θ · C_n^α(cos θ)]² sin^{D−k−2}θ dθ by midpoint
+ * quadrature — the layer's contribution to ∫_{S^{D−1}} |Y|² dΩ (1 when
+ * the layer is unit-normalized).
+ */
+function layerNormIntegral(lk: number, lkp1: number, D: number, k: number): number {
+  const norm = computeHypersphericalLayerNorm(lk, lkp1, D, k)
+  const n = lk - lkp1
+  const alpha = lkp1 + (D - k - 2) / 2
+  const steps = 4000
+  const h = Math.PI / steps
+  let sum = 0
+  for (let i = 0; i < steps; i++) {
+    const theta = (i + 0.5) * h
+    const g = norm * Math.pow(Math.sin(theta), lkp1) * gegenbauer(n, alpha, Math.cos(theta))
+    sum += g * g * Math.pow(Math.sin(theta), D - k - 2)
+  }
+  return sum * h
 }
 
 // ----------------------------------------------------------------------------
@@ -190,10 +225,40 @@ describe('computeHydrogenRadialNormND — invalid input hardening', () => {
 })
 
 describe('computeHypersphericalLayerNorm — closed-form values', () => {
-  it('matches Gegenbauer norm √(2/3) for C_1^{1} (D=4, k=0, lk=1, lkp1=0)', () => {
-    // α = lkp1 + (D-k-2)/2 = 0 + 1 = 1 → C_1^{1}, whose orthogonality norm is √(2/3).
+  it('matches the Gegenbauer norm √(2/π) for C_1^{1} (D=4, k=0, lk=1, lkp1=0)', () => {
+    // α = lkp1 + (D-k-2)/2 = 0 + 1 = 1 → C_1^{1}(x) = 2x with weight sin²θ:
+    // ∫₀^π 4cos²θ sin²θ dθ = π/2, so N = √(2/π). (The old closed form gave √(2/3).)
     const norm = computeHypersphericalLayerNorm(1, 0, 4, 0)
-    expect(norm).toBeCloseTo(Math.sqrt(2 / 3), 6)
+    expect(norm).toBeCloseTo(Math.sqrt(2 / Math.PI), 6)
+  })
+
+  it('reproduces the constant S³ harmonic 1/√(2π²) at l = 0 in D = 4', () => {
+    // Y_0 on S³ is the constant 1/√|S³| = 1/√(2π²); the chain is N_0 · Y_00 with
+    // Y_00 = 1/√(4π), so N_0 must be √(4π / (2π²)) = √(2/π).
+    const norm = computeHypersphericalLayerNorm(0, 0, 4, 0)
+    expect(norm / Math.sqrt(4 * Math.PI)).toBeCloseTo(1 / Math.sqrt(2 * Math.PI * Math.PI), 8)
+  })
+
+  it('unit-normalizes every layer the shader emits (quadrature of ∫|layer|² = 1)', () => {
+    let worst = 0
+    let worstAt = ''
+    for (let D = 4; D <= 11; D++) {
+      for (let k = 0; k <= D - 4; k++) {
+        for (let lk = 0; lk <= 6; lk++) {
+          for (let lkp1 = 0; lkp1 <= lk; lkp1++) {
+            const err = Math.abs(layerNormIntegral(lk, lkp1, D, k) - 1)
+            if (err > worst) {
+              worst = err
+              worstAt = `lk=${lk} lkp1=${lkp1} D=${D} k=${k}`
+            }
+          }
+        }
+      }
+    }
+    // Budget: the 7-digit ln Γ(n/2) / ln n! LUTs shared with WGSL (observed
+    // ≈1.8e-6; see docs/physics/hydrogen-nd-extension.md §2.4). The pre-fix
+    // closed form missed by 0.3–0.7 on these layers.
+    expect(worst, `worst layer ${worstAt}`).toBeLessThan(1.5e-5)
   })
 
   it('nk=0 (lk=lkp1) gives finite, positive norm (Gegenbauer degree zero)', () => {

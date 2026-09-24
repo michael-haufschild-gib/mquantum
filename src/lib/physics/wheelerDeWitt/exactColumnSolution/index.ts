@@ -258,7 +258,7 @@ export function columnSolutionZeroV(a: number, A: ComplexPair, B: ComplexPair): 
  * agreement test loosens the tolerance here correspondingly.
  *
  * Derivative:
- *   χ' = (1/4)·(|U|^{−1/4})'·(A·cos Φ + B·sin Φ)
+ *   χ' = (|U|^{−1/4})'·(A·cos Φ + B·sin Φ)
  *      + |U|^{−1/4}·(−A·sin Φ + B·cos Φ)·Φ'(a)
  *   (|U|^{−1/4})' = −(1/4)·|U|^{−5/4}·|U|'     (|U|' = −U' since U < 0)
  *   Φ'(a) = √|U|

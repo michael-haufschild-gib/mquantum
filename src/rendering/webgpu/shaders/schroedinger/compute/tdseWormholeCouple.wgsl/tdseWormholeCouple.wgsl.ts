@@ -14,6 +14,9 @@
  *   `ψ_new(v)  = cos(τg)·ψ(v)  − i·sin(τg)·ψ(v')`
  *   `ψ_new(v') = cos(τg)·ψ(v') − i·sin(τg)·ψ(v)`
  *
+ * In imaginary time the kick is `exp(−τ·g·P_M) = cosh(τg)·I − sinh(τg)·P_M`;
+ * the host then writes (cosh, sinh) into the same two uniform slots.
+ *
  * Dispatch strategy (a) — "half-space": the compute pass is launched with
  * enough workgroups to cover half the lattice. Each thread maps to a voxel
  * `v` with `coord[axis] < N/2`, reads both `ψ(v)` and `ψ(v')` from the
@@ -106,18 +109,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var outVP = zVP;
 
   if (params.wormholeCouplingEnabled != 0u) {
-    // cos/sin of (0.5·dt·g) are dispatch-uniform; precomputed host-side.
+    // cos/sin (cosh/sinh in imaginary time) of (0.5·dt·g) are dispatch-uniform;
+    // precomputed host-side.
     let c = params.wormholeCosTau;
     let s = params.wormholeSinTau;
-    let reV  = zV.x;
-    let imV  = zV.y;
-    let reVP = zVP.x;
-    let imVP = zVP.y;
+    if (params.imaginaryTime != 0u) {
+      // exp(−τg·P_M) = cosh(τg)·I − sinh(τg)·P_M — real mixing, norm restored
+      // by the imaginary-time renormalization like the potential decay.
+      outV = c * zV - s * zVP;
+      outVP = c * zVP - s * zV;
+    } else {
+      let reV  = zV.x;
+      let imV  = zV.y;
+      let reVP = zVP.x;
+      let imVP = zVP.y;
 
-    // (a − ib)·(x + iy) = (ax + by) + i(ay − bx). Here the coefficient acting
-    // on ψ(v') is (−i·s) → real part contribution = +s·im(ψ(v')), imag = −s·re(ψ(v')).
-    outV = vec2f(c * reV  + s * imVP, c * imV  - s * reVP);
-    outVP = vec2f(c * reVP + s * imV,  c * imVP - s * reV);
+      // (a − ib)·(x + iy) = (ax + by) + i(ay − bx). Here the coefficient acting
+      // on ψ(v') is (−i·s) → real part contribution = +s·im(ψ(v')), imag = −s·re(ψ(v')).
+      outV = vec2f(c * reV  + s * imVP, c * imV  - s * reVP);
+      outVP = vec2f(c * reVP + s * imV,  c * imVP - s * reV);
+    }
   }
 
   let ctcStrength = clamp(params.ctcPostselectionStrength, 0.0, 1.0);

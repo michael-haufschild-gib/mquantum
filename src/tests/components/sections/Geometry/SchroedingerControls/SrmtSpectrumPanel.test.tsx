@@ -96,6 +96,8 @@ describe('SrmtSpectrumPanel', () => {
   })
 
   it('non-selected clocks with NaN quality render the pending tier', () => {
+    // Queued clocks: the worker batch is still in flight.
+    act(() => useSrmtDiagnosticStore.getState().beginSrmtComputing())
     populate(makeSnapshot(), { a: 0.05, phi1: Number.NaN, phi2: Number.NaN })
     render(<SrmtSpectrumPanel srmtEnabled={true} selectedClock="a" />)
     expect(screen.getByTestId('wdw-srmt-clock-row-phi1-chip')).toHaveAttribute(
@@ -108,6 +110,19 @@ describe('SrmtSpectrumPanel', () => {
     )
     expect(screen.getByTestId('wdw-srmt-clock-row-phi1-chip')).toHaveTextContent('pending')
     expect(screen.getByTestId('wdw-srmt-clock-row-phi2-chip')).toHaveTextContent('pending')
+  })
+
+  // Regression: a worker error aborts the queue and clears `computing`,
+  // leaving undrained clocks NaN — they kept reading "pending" / "queued or
+  // computing" for a reply that never comes.
+  it('labels clocks left without a result after the batch ended as n/a', () => {
+    populate(makeSnapshot(), { a: 0.05, phi1: Number.NaN, phi2: Number.NaN })
+    act(() => useSrmtDiagnosticStore.getState().setSrmtComputing(false))
+    render(<SrmtSpectrumPanel srmtEnabled={true} selectedClock="a" />)
+    const chip = screen.getByTestId('wdw-srmt-clock-row-phi1-chip')
+    expect(chip).toHaveAttribute('data-tier', 'pending')
+    expect(chip).toHaveTextContent('n/a')
+    expect(screen.getByTestId('wdw-srmt-clock-row-a-chip')).toHaveTextContent('0.050')
   })
 
   it('selected clock row is marked as selected', () => {

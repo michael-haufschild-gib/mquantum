@@ -185,6 +185,35 @@ export function maxChshGivenEta(eta: number, mode: 'fairSampling' | 'assignNonDe
     : maxChshUnderAssignNonDetection(eta)
 }
 
+/**
+ * Max |S| for a Werner state of visibility v measured with symmetric
+ * detection efficiency η, maximized over the measurement settings.
+ *
+ *  - fairSampling: coincidences are an unbiased Werner sample → 2√2·v (η > 0).
+ *  - assignNonDetection (+1 for a miss): E = η²·E_W + (1 − η)²·1 — single
+ *    misses contribute 0 because the Werner marginals are unbiased — so
+ *    S_max = η²·v·2√2 + 2(1 − η)².
+ *
+ * The separate Werner and η ceilings do not compose by min(): at v = 0.8,
+ * η = 0.9 the joint maximum is 1.853 (no violation) even though each
+ * threshold alone would allow one.
+ *
+ * @param visibility - Werner v ∈ [0, 1].
+ * @param eta - Symmetric detection efficiency η ∈ [0, 1].
+ * @param mode - Analysis policy for trials containing a non-detection.
+ * @returns Maximum achievable |S|.
+ */
+export function maxChshForWernerGivenEta(
+  visibility: number,
+  eta: number,
+  mode: 'fairSampling' | 'assignNonDetection'
+): number {
+  const v = clampUnit(visibility)
+  const x = clampUnit(eta)
+  if (mode === 'fairSampling') return x > 0 ? v * 2 * Math.SQRT2 : 0
+  return x * x * v * 2 * Math.SQRT2 + 2 * (1 - x) * (1 - x)
+}
+
 function clampUnit(x: number): number {
   return x <= 0 ? 0 : x >= 1 ? 1 : x
 }

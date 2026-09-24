@@ -32,6 +32,30 @@ import {
 import type { SetterContext } from './sliceSetterUtils'
 
 /**
+ * Project `eta0` onto the conformal-time gauge of `preset`, keeping the
+ * magnitude. Bianchi-I and LQC bounce live on `η > 0` (their evaluators
+ * throw on `η ≤ 0`); every isotropic FLRW preset uses `η < 0`. LQC is
+ * additionally snapped into its `[1, 19]` table window. Mirrors the sign
+ * flip `resolvePresetSwitchSubstate` applies on a preset switch, so values
+ * arriving through the direct η₀ setter (URL `cos_eta0`, devtools) or a
+ * partial scene patch cannot leave a Bianchi-I/LQC state with `η₀ < 0`,
+ * which made `sampleAdiabaticVacuum` throw on every reset frame.
+ *
+ * @param preset - Active cosmology preset
+ * @param eta0 - Non-zero finite conformal time
+ * @returns `eta0` with the preset's gauge sign (and LQC window) applied
+ */
+export function projectEta0ToPresetGauge(
+  preset: FreeScalarConfig['cosmology']['preset'],
+  eta0: number
+): number {
+  const positiveEta = preset === 'bianchiKasner' || preset === 'lqcBounce'
+  const signed = positiveEta ? Math.abs(eta0) : -Math.abs(eta0)
+  if (preset === 'lqcBounce') return Math.min(19, Math.max(1, signed))
+  return signed
+}
+
+/**
  * Re-enforce cosmology invariants after a lattice change (latticeDim, gridSize,
  * spacing, initialCondition grid-snap, ...). Three invariants are maintained:
  *
@@ -103,10 +127,18 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
   // Bianchi-I does not use the isotropic safe-η₀ heuristic — the runtime
   // COSMOLOGY_ETA_FLOOR is the only guard needed. Matches the bypass in
   // resolveEta0ForPresetSwitch and setFreeScalarCosmologyEnabled.
-  if (fs.cosmology.preset !== 'bianchiKasner' && fs.cosmology.preset !== 'lqcBounce') {
+  // Every preset first gets its gauge sign: a partial scene patch that sets
+  // `preset: 'bianchiKasner'` over the default `eta0 = -10` would otherwise
+  // reach `sampleAdiabaticVacuum` with η₀ < 0 and throw on every reset.
+  const gaugedEta0 = projectEta0ToPresetGauge(fs.cosmology.preset, fs.cosmology.eta0)
+  if (fs.cosmology.preset === 'bianchiKasner' || fs.cosmology.preset === 'lqcBounce') {
+    if (Number.isFinite(gaugedEta0) && gaugedEta0 !== fs.cosmology.eta0) {
+      return { cosmology: { ...fs.cosmology, eta0: gaugedEta0 }, needsReset: true }
+    }
+  } else {
     try {
-      const result = clampEta0(fs.cosmology.eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
-      if (result.clamped) {
+      const result = clampEta0(gaugedEta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+      if (result.clamped || result.eta0 !== fs.cosmology.eta0) {
         return {
           cosmology: { ...fs.cosmology, eta0: result.eta0 },
           needsReset: true,
@@ -288,6 +320,10 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
         let nextEnabled = enabled
         let { eta0 } = fs.cosmology
         if (enabled) {
+          // A disabled state may hold an off-gauge η₀ (the η₀ setter stores
+          // verbatim outside the cosmology dims); fix the sign before the
+          // Bianchi-I / LQC bypass below lets it reach the sampler.
+          eta0 = projectEta0ToPresetGauge(fs.cosmology.preset, eta0)
           const params = {
             preset: fs.cosmology.preset,
             spacetimeDim: fs.latticeDim + 1,
@@ -400,8 +436,10 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
         const fs = state.schroedinger.freeScalar
         // Only trigger a field reset when the exponents satisfy the vacuum
         // Kasner conditions (Σpᵢ = 1, Σpᵢ² = 1). Non-vacuum triples are
-        // stored for UI display but won't reset the GPU field — the physics
-        // code (computeBianchiKasnerCoefs) would throw for invalid triples.
+        // stored (the evaluator accepts any finite triple with Σp ≤ n−1 as a
+        // non-vacuum Bianchi-I background; Σp > n−1 makes it throw and the
+        // pipeline falls back to Minkowski coefs) but do not re-sample the
+        // vacuum, so dragging a slider does not reset the field every tick.
         const vacuumValid = isKasnerVacuum({ p1, p2, p3 }, 1e-4)
         return {
           schroedinger: {
@@ -527,7 +565,11 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
             },
           }
         }
-        let clampedEta0 = eta0
+        // Apply the preset's gauge sign first: the slider already restricts
+        // each preset to its sign, but URL `cos_eta0` and devtools calls do
+        // not (a `bianchiKasner` + `cos_eta0=-5` link crashed every reset).
+        const gaugedEta0 = projectEta0ToPresetGauge(fs.cosmology.preset, eta0)
+        let clampedEta0 = gaugedEta0
         const params = {
           preset: fs.cosmology.preset,
           spacetimeDim,
@@ -542,10 +584,10 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
           if (fs.cosmology.preset === 'bianchiKasner' || fs.cosmology.preset === 'lqcBounce') {
             // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
             // runtime COSMOLOGY_ETA_FLOOR is the only guard needed.
-            clampedEta0 = eta0
+            clampedEta0 = gaugedEta0
           } else {
             try {
-              const result = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+              const result = clampEta0(gaugedEta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
               clampedEta0 = result.eta0
             } catch (e) {
               // Match the other setters: a corrupted gridSize/spacing shouldn't
@@ -554,7 +596,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
               // lattice state stays invalid.
               logger.warn(
                 `[setFreeScalarCosmologyEta0] clampEta0 failed for ` +
-                  `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+                  `eta0=${gaugedEta0}: ${e instanceof Error ? e.message : String(e)}`
               )
             }
           }

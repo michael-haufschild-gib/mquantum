@@ -119,7 +119,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           />
           <Slider
             label="Packet Width"
-            tooltip="Spatial width (σ) of the initial Gaussian wavepacket. Smaller values give a more localized particle with higher momentum uncertainty."
+            tooltip="Spatial width (σ) of the initial Gaussian wavepacket. Smaller values give a more localized particle with higher momentum uncertainty. Not used by the Plane Wave state, which fills the lattice."
             min={0.1}
             max={5.0}
             step={0.05}

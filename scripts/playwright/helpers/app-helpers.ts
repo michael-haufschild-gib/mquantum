@@ -15,6 +15,34 @@ export const FIRST_FRAME_TIMEOUT = 20_000
 export const APP_LOAD_TIMEOUT = 15_000
 export const UI_SETTLE_TIMEOUT = 5_000
 
+/**
+ * Wait until an async page-side predicate resolves truthy.
+ *
+ * `page.waitForFunction` does NOT await a Promise returned by its predicate:
+ * a pending Promise is truthy, so `waitForFunction(async () => …)` resolved on
+ * the first poll without checking anything (verified: `async () => false`
+ * returns after ~50 ms instead of timing out). Use this for predicates that
+ * need `await` (dynamic imports); keep `waitForFunction` for synchronous ones.
+ *
+ * @param page - Playwright page
+ * @param predicate - Page-side async predicate
+ * @param arg - Serializable argument passed to the predicate
+ * @param options - `timeout` in ms (default 30 s)
+ */
+export async function waitForPageCondition<Arg>(
+  page: Page,
+  predicate: (arg: Arg) => Promise<unknown>,
+  arg?: Arg,
+  options: { timeout?: number } = {}
+): Promise<void> {
+  await expect
+    .poll(async () => Boolean(await page.evaluate(predicate, arg as Arg)), {
+      timeout: options.timeout ?? 30_000,
+      intervals: [16, 50, 100],
+    })
+    .toBe(true)
+}
+
 // ─── App Load & Renderer ─────────────────────────────────────────────────────
 
 /** Wait for the top bar to be visible — proves React tree mounted. */
@@ -207,8 +235,23 @@ export async function requireWebGPU(
 
 // ─── Store Access ────────────────────────────────────────────────────────────
 
+/**
+ * Wait until main.tsx's DEV store bridge has been installed on `window`.
+ * The bridge is populated from a Promise.all of dynamic imports, so it can
+ * land after the renderer reports ready — reading it immediately raced and
+ * failed intermittently with "DEV bridge not registered".
+ */
+export async function waitForStoreBridge(page: Page, timeout = 15_000): Promise<void> {
+  await page.waitForFunction(
+    () => !!window.__GEOMETRY_STORE__ && !!window.__EXTENDED_OBJECT_STORE__,
+    null,
+    { timeout }
+  )
+}
+
 /** Read geometry store fields from the running app. */
 export async function getGeometryState(page: Page) {
+  await waitForStoreBridge(page)
   return page.evaluate(async () => {
     const mod = { useGeometryStore: window.__GEOMETRY_STORE__ }
     if (!mod.useGeometryStore) {
@@ -221,6 +264,7 @@ export async function getGeometryState(page: Page) {
 
 /** Read the current quantum mode from the extended object store. */
 export async function getQuantumMode(page: Page): Promise<string> {
+  await waitForStoreBridge(page)
   return page.evaluate(async () => {
     const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
     if (!mod.useExtendedObjectStore) {
@@ -234,6 +278,7 @@ export async function getQuantumMode(page: Page): Promise<string> {
 
 /** Read dimension from geometry store. */
 export async function getDimension(page: Page): Promise<number> {
+  await waitForStoreBridge(page)
   return page.evaluate(async () => {
     const mod = { useGeometryStore: window.__GEOMETRY_STORE__ }
     if (!mod.useGeometryStore) {
@@ -245,6 +290,7 @@ export async function getDimension(page: Page): Promise<number> {
 
 /** Read full app state snapshot for URL/store consistency checks. */
 export async function getAppState(page: Page) {
+  await waitForStoreBridge(page)
   return page.evaluate(async () => {
     const geoStore = window.__GEOMETRY_STORE__
     const extStore = window.__EXTENDED_OBJECT_STORE__
@@ -597,10 +643,12 @@ export async function waitForDiagnostics(
  * Wait for a fresh GPU readback after a parameter change.
  *
  * Two-phase approach to avoid reading stale in-flight mapAsync data:
- * 1. Drain: wait a few frames so any in-flight readbacks from the OLD config
- *    complete and write to the store.
- * 2. Snapshot the current `readbackGeneration`, then wait for it to advance.
- *    The next readback is guaranteed to be from the NEW config.
+ * 1. Drain: wait 3 animation frames so any in-flight readbacks from the OLD
+ *    config complete and write to the store.
+ * 2. Snapshot the current `readbackGeneration`, then wait for it to advance —
+ *    or, for a static state that never reads back again, for it to stay
+ *    unchanged for 400 ms while the channel holds data (its post-change
+ *    readback already landed).
  *
  * Use this instead of bare `waitForDiagnostics` after changing quantum
  * numbers, potential type, OQ config, or any parameter that changes what
@@ -615,41 +663,52 @@ export async function waitForFreshReadback(
   timeout = 30_000,
   channel?: string
 ): Promise<void> {
-  // Phase 1: drain stale in-flight readbacks (typically ≤1 in flight)
-  const fc = await getFrameCount(page)
-  await waitForFrameAdvance(page, fc + 3, timeout)
-
   const windowKey = storePathToWindowKey(storeModule)
+  // Drop tracking left behind by a call that timed out.
+  await page.evaluate(() => {
+    delete (window as unknown as { __freshReadback?: unknown }).__freshReadback
+  })
 
-  // Phase 2: snapshot generation and wait for a post-drain readback
-  const gen = await page.evaluate(
-    ([key, ch]: [keyof Window, string | null]) => {
-      const store = window[key] as
-        | { getState?: () => Record<string, { readbackGeneration: number }> }
-        | undefined
-      if (!store?.getState) return 0
-      const state = store.getState()
-      if (ch)
-        return (state[ch] as { readbackGeneration: number } | undefined)?.readbackGeneration ?? 0
-      return (state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0
-    },
-    [windowKey, channel ?? null] as [keyof Window, string | null]
-  )
-
+  // Counted in real animation frames inside the page: `data-frame-count` is
+  // written sparsely (first 10 frames, then every 60th), so draining "3
+  // frames" through it took ~1 s — long enough for the post-change readback
+  // to land during the drain. A static state (e.g. a single eigenstate)
+  // never reads back again, and waiting for a strictly newer generation then
+  // timed out. Returns when either
+  //   • a readback lands after a 3-frame drain (continuously updating state), or
+  //   • the generation has been stable for 400 ms after the drain (static
+  //     state whose post-change readback already landed).
   await page.waitForFunction(
-    ([key, prevGen, ch]: [keyof Window, number, string | null]) => {
+    ([key, ch]: [keyof Window, string | null]) => {
       const store = window[key] as
         | { getState?: () => Record<string, { readbackGeneration: number }> }
         | undefined
       if (!store?.getState) return false
       const state = store.getState()
-      const gen = ch
-        ? ((state[ch] as { readbackGeneration: number } | undefined)?.readbackGeneration ?? 0)
-        : ((state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0)
-      return gen > prevGen
+      const slot = (ch ? state[ch] : state) as
+        | { readbackGeneration?: number; hasData?: boolean }
+        | undefined
+      const gen = slot?.readbackGeneration ?? 0
+      const hasData = slot?.hasData === true
+      const w = window as unknown as {
+        __freshReadback?: { frames: number; drainGen: number; lastGen: number; lastAt: number }
+      }
+      const now = performance.now()
+      const t = (w.__freshReadback ??= { frames: 0, drainGen: -1, lastGen: gen, lastAt: now })
+      t.frames++
+      if (gen !== t.lastGen) {
+        t.lastGen = gen
+        t.lastAt = now
+      }
+      if (t.frames === 3) t.drainGen = gen
+      // The stable branch also needs data: a channel whose readbacks never
+      // run (diagnostics disabled) or that just reset must not "settle".
+      const done = t.frames > 3 && (gen > t.drainGen || (hasData && now - t.lastAt > 400))
+      if (done) delete w.__freshReadback
+      return done
     },
-    [windowKey, gen, channel ?? null] as [keyof Window, number, string | null],
-    { timeout }
+    [windowKey, channel ?? null] as [keyof Window, string | null],
+    { timeout, polling: 'raf' }
   )
 }
 
@@ -667,25 +726,46 @@ export async function resetAndWaitForDensityDiagnostics(
       throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
     }
     mod.useDiagnosticsStore.getState().resetDensity()
+    // Force a readback of the CURRENT state. Callers reset after their
+    // parameter change, so for a static grid the post-change readback could
+    // already have landed — and been erased by the reset above — with no
+    // further readback ever coming (a deadlock). Re-applying the unchanged
+    // density gain bumps schroedingerVersion, so the grid recomputes and reads
+    // back; the grid stores raw |ψ|², so the value itself is untouched.
+    const ext = window.__EXTENDED_OBJECT_STORE__
+    if (!ext) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    const state = ext.getState()
+    state.setSchroedingerDensityGain(state.schroedinger.densityGain)
   })
   await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', timeout, 'density')
 }
 
 /**
- * Wait for the simulation to render at least `minFrames` frames.
+ * Wait for the simulation to render `minFrames` MORE frames from now.
  * For compute modes, simulation steps = frames × stepsPerFrame.
+ *
+ * Relative to the call: it used to compare the page's absolute frame count
+ * with `minFrames`, so once a page had rendered that many frames (routinely
+ * true after setup) "let the field evolve for N frames" returned at once and
+ * before/after snapshots compared the same instant. The counter attribute is
+ * written every 60th frame past the first 10, so the wait resolves within
+ * one such stride of the requested count. Rendering continues while the
+ * animation is paused, so paused pages still advance.
  */
 export async function waitForSimulationFrames(
   page: Page,
   minFrames = 120,
   timeout = 60_000
 ): Promise<void> {
+  const start = await getFrameCount(page)
   await page.waitForFunction(
-    (min: number) => {
+    (target: number) => {
       const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
-      return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > min
+      return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) >= target
     },
-    minFrames,
+    start + minFrames,
     { timeout }
   )
 }
@@ -1134,7 +1214,8 @@ export async function applyBecPreset(page: Page, presetId: string): Promise<void
     await extStore.getState().applyBecPreset(id)
   }, presetId)
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async (id: string) => {
       const extStore = window.__EXTENDED_OBJECT_STORE__
       if (!extStore) return false
@@ -1187,7 +1268,8 @@ export async function applyDiracPreset(page: Page, presetId: string): Promise<vo
     await extStore.getState().applyDiracPreset(id)
   }, presetId)
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async (id: string) => {
       const extStore = window.__EXTENDED_OBJECT_STORE__
       if (!extStore) return false
@@ -1320,7 +1402,7 @@ export async function waitForOQEvolution(
   timeout = 60_000
 ): Promise<void> {
   await page.waitForFunction(
-    async (min: number) => {
+    (min: number) => {
       const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
       if (!mod.useDiagnosticsStore) {
         throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')

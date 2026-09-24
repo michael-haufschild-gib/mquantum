@@ -551,3 +551,36 @@ describe('supportsFlatFourierObservables', () => {
     ).toBe(false)
   })
 })
+
+// Regression: the observables reductions declared 24 channels × 256 threads of
+// f32 workgroup storage (24 KiB), above WebGPU's guaranteed
+// maxComputeWorkgroupStorageSize (16 KiB) — pipeline creation failed on
+// adapters exposing only the spec minimum.
+describe('observables reduce shaders fit the guaranteed workgroup storage', () => {
+  it('declare ≤ 16 KiB of workgroup memory and a matching 128-thread workgroup', async () => {
+    const pos =
+      await import('@/rendering/webgpu/shaders/schroedinger/compute/observablesPositionReduce.wgsl')
+    const mom =
+      await import('@/rendering/webgpu/shaders/schroedinger/compute/observablesMomentumReduce.wgsl')
+    const blocks = [
+      pos.observablesPositionReduceBlock,
+      pos.observablesPositionFinalizeBlock,
+      mom.observablesMomentumReduceBlock,
+      mom.observablesMomentumFinalizeBlock,
+    ]
+    for (const wgsl of blocks) {
+      const match = wgsl.match(/var<workgroup> sdata: array<f32, (\d+)>/)
+      if (!match) throw new Error('sdata declaration not found')
+      expect(Number(match[1]) * 4).toBeLessThanOrEqual(16384)
+      expect(wgsl).toContain('const WG_SIZE: u32 = 128u;')
+      expect(wgsl).toContain('@compute @workgroup_size(128)')
+      expect(wgsl).toContain('for (var stride: u32 = 64u;')
+    }
+  })
+
+  it('sizes the first-pass dispatch for 128-thread workgroups', () => {
+    const { device } = createMockDevice()
+    const resources = createObservablesBuffers(device, 1000, 3)
+    expect(resources.numWorkgroups).toBe(Math.ceil(1000 / 128))
+  })
+})

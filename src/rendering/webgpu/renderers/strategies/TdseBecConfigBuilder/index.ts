@@ -10,7 +10,7 @@
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import type { BecConfig, BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/bec'
-import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
+import { DEFAULT_BEC_CONFIG, normalizeBecVortexPlane } from '@/lib/geometry/extended/bec'
 import {
   DEFAULT_TDSE_CONFIG,
   type TdseConfig,
@@ -94,23 +94,25 @@ function sanitizeFieldView(
 
 function sanitizeVortexPlane(
   value: readonly number[] | undefined,
-  fallback: readonly [number, number],
+  which: 1 | 2,
   latDim: number
 ): [number, number] {
-  const a = clampFiniteInteger(value?.[0], fallback[0], 0, latDim - 1)
-  const b = clampFiniteInteger(value?.[1], fallback[1], 0, latDim - 1)
-  return a === b ? [0, Math.min(1, latDim - 1)] : [a, b]
+  // Out-of-range or degenerate planes take the per-dimension default: the
+  // former clamp turned plane 2's zw default into [2, 2] on a 3D lattice and
+  // then collapsed it onto plane 1 (two parallel lines, no reconnection).
+  return normalizeBecVortexPlane(value, which, latDim)
 }
 
 /** Validate BEC initial condition and compute mapped init type + momentum params. */
 function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   let initCond = sanitizeInitialCondition(bec.initialCondition)
 
-  // Attractive BEC (g < 0): Thomas-Fermi doesn't apply → force Gaussian.
-  // blackHoleAnalog also needs g > 0 because its background density comes from
-  // μ/g; fall back to a Gaussian wavepacket to avoid a divide-by-negative.
+  // Attractive or ideal BEC (g ≤ 0): Thomas-Fermi doesn't apply → force Gaussian.
+  // Every TF-derived profile below (and blackHoleAnalog's background) is
+  // n = (μ − V)/g; the init shader floors |g| at 1e-10, so g = 0 seeded
+  // n ≈ μ·1e10 (norm ~1.5e9 on the default grid) instead of a finite state.
   if (
-    g < 0 &&
+    g <= 0 &&
     (initCond === 'thomasFermi' ||
       initCond === 'vortexImprint' ||
       initCond === 'vortexLattice' ||
@@ -321,8 +323,8 @@ export function buildBecConfig(
       observablesEnabled: booleanOr(bec.observablesEnabled, false),
       imaginaryTimeEnabled: false,
       // N-D vortex reconnection plane configuration
-      vortexPlane1: sanitizeVortexPlane(bec.vortexPlane1, [0, 1], latDim),
-      vortexPlane2: sanitizeVortexPlane(bec.vortexPlane2, [0, 1], latDim),
+      vortexPlane1: sanitizeVortexPlane(bec.vortexPlane1, 1, latDim),
+      vortexPlane2: sanitizeVortexPlane(bec.vortexPlane2, 2, latDim),
       vortexSeparation: clampFinite(bec.vortexSeparation, 0, 0, 5),
       vortexPairCount: clampFiniteInteger(bec.vortexPairCount, 2, 1, 2),
       // Kaluza-Klein compactification (pass through from BEC config)

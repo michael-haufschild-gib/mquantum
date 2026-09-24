@@ -30,6 +30,7 @@ import {
   lambdaForStep,
   useQuantumnessAtlasStore,
 } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -39,6 +40,16 @@ const POLL_MS = 400
 /** If no new entanglement sample arrives for this many polls, abort the point as stalled. */
 const STALL_POLL_LIMIT = 75 // 75 × 400ms = 30s
 
+/**
+ * Entanglement samples are only produced while the simulation is playing in
+ * a visible tab (TDSE skips entanglement readback when paused), so stall
+ * polls are counted only then — pausing or backgrounding must not abort.
+ */
+function isEntanglementSamplingActive(): boolean {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  return useAnimationStore.getState().isPlaying
+}
+
 /** Update stall counter. Returns true if stalled (no progress for STALL_POLL_LIMIT polls). */
 function checkStalled(
   entSamples: number,
@@ -46,7 +57,7 @@ function checkStalled(
   stallCountRef: { current: number }
 ): boolean {
   if (entSamples === lastSeenN) {
-    stallCountRef.current++
+    if (isEntanglementSamplingActive()) stallCountRef.current++
   } else if (entSamples > lastSeenN) {
     stallCountRef.current = 0
   }
@@ -108,6 +119,14 @@ export function useAtlasSweepController(): {
   const lastSeenNRef = useRef(0)
   /** Polls without new entanglement data — detects stalled simulations. */
   const stallCountRef = useRef(0)
+  /**
+   * entSamples observed at the previous poll, for stall detection only.
+   * `lastSeenNRef` stays 0 through the whole thermalization window, so it
+   * cannot detect a stall there once the first sample has arrived — a
+   * diverging point (non-finite entropy never advances `longTimeN`) then
+   * hung the sweep forever instead of aborting after STALL_POLL_LIMIT polls.
+   */
+  const stallSeenNRef = useRef(0)
 
   const status = useQuantumnessAtlasStore((s) => s.status)
 
@@ -191,6 +210,8 @@ export function useAtlasSweepController(): {
     pointStartNRef.current = useCoordinateEntanglementStore.getState().longTimeN
     samplesRecordedRef.current = 0
     lastSeenNRef.current = 0
+    stallSeenNRef.current = 0
+    stallCountRef.current = 0
 
     applyPointConfig(firstDim, firstLambda, firstGamma, true)
   }
@@ -227,7 +248,9 @@ export function useAtlasSweepController(): {
         atlas.tickFrame()
 
         // Stall detection: abort if no worker results for ~30s
-        if (checkStalled(entSamples, lastSeenNRef.current, stallCountRef)) {
+        const stalled = checkStalled(entSamples, stallSeenNRef.current, stallCountRef)
+        stallSeenNRef.current = entSamples
+        if (stalled) {
           logger.warn('[atlas] Sweep stalled — no entanglement results after 30s, aborting')
           useQuantumnessAtlasStore.getState().abortSweep()
           restoreSnapshot()
@@ -274,6 +297,7 @@ export function useAtlasSweepController(): {
           pointStartNRef.current = entStore.longTimeN
           samplesRecordedRef.current = 0
           lastSeenNRef.current = 0
+          stallSeenNRef.current = 0
           stallCountRef.current = 0
 
           applyPointConfig(next.dim, next.lambda, next.gamma, next.dimChanged)

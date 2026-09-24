@@ -41,7 +41,7 @@ import { pauliWriteGridBlock } from '../../shaders/schroedinger/compute/pauliWri
 import { pmlProfileBlock } from '../../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
   fftAxisUniformsBlock,
-  tdseSharedMemFFTTwiddleBlock,
+  sharedMemFFTMultiPencilTwiddleBlock,
 } from '../../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
 import { createComputeBGL } from '../../utils/computeBindGroupLayout'
 
@@ -113,7 +113,7 @@ export interface PauliBindGroupResult {
    * Forward axes occupy slots [0, latticeDim); inverse axes occupy
    * [latticeDim, 2·latticeDim). Inside the batched Strang-step compute pass
    * the host iterates this array, calling `setBindGroup(0, fftSharedMemBGs[slot])`
-   * + `dispatchWorkgroups(totalSites / axisDim)` for each axis.
+   * + `dispatchWorkgroups(sharedMemFFTWorkgroupCount(totalSites, axisDim))` for each axis.
    */
   fftSharedMemBGs: GPUBindGroup[]
   writeGridBG: GPUBindGroup
@@ -266,10 +266,12 @@ export function composePauliUnpackShader(): string {
  * twiddles from a storage buffer instead of calling cos/sin per thread.
  *
  * Reuses the TDSE shared-memory FFT shader bytes — the kernel is grid-config
- * agnostic and the bind group layout is identical.
+ * agnostic and the bind group layout is identical. Multi-pencil variant,
+ * dispatched with `sharedMemFFTWorkgroupCount` (one pencil per workgroup
+ * exceeded the 65535 dispatch limit at the default 7D 8⁷ grid).
  */
 export function composePauliFftSharedMemShader(): string {
-  return `\n${fftAxisUniformsBlock}\n${tdseSharedMemFFTTwiddleBlock}\n`
+  return `\n${fftAxisUniformsBlock}\n${sharedMemFFTMultiPencilTwiddleBlock}\n`
 }
 
 /** Pure WGSL for the Pauli diagnostics reduce compute shader. */

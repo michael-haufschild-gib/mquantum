@@ -49,6 +49,7 @@ import {
   nestedIntSetter,
   nestedValueSetter,
   type SetterContext,
+  sharedPmlClampedSetter,
 } from './sliceSetterUtils'
 
 /** Actions exposed by the free-scalar field setter bundle. */
@@ -423,7 +424,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
         },
       }))
     },
-    setFreeScalarPmlTargetReflection: nestedClampedSetter(
+    setFreeScalarPmlTargetReflection: sharedPmlClampedSetter(
       ctx,
       D,
       'pmlTargetReflection',

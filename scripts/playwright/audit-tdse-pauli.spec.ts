@@ -23,6 +23,7 @@ import {
   gotoPauli,
   requireWebGPU,
   waitForFrameAdvance,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -74,7 +75,8 @@ async function profile(
   await waitForFrameAdvance(page, warmStart + WARMUP_FRAMES, 30_000)
   const measureStart = await getFrameCount(page)
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES, 30_000)
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
       // `fps` initializes to 60 (smoothed history), so it cannot signal that

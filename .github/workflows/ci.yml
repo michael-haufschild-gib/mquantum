@@ -1,10 +1,12 @@
 name: CI
 
+# Basic checks only (lint, type check, build) to conserve Actions minutes.
+# Unit tests, coverage, ratchets, WASM/clippy and E2E run locally:
+#   pnpm exec vitest run · pnpm lint:rust · pnpm exec playwright test
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,7 +15,7 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v6
@@ -30,73 +32,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Prettier does NOT run in CI. Formatting is auto-applied locally by
-      # husky + lint-staged on every commit. A `prettier --check` step only
-      # fails the pipeline on drift that --write would have silently fixed,
-      # and `--write` in CI is a no-op (the runner discards the changes).
-      # The guard below rejects any future re-introduction of either form.
-      - name: Reject prettier in CI
-        run: node scripts/check-no-prettier-check.js
-
       - name: Lint
         run: pnpm exec eslint . --max-warnings 0 --no-warn-ignored
 
       - name: Lint CSS
         run: pnpm exec stylelint "src/**/*.css" --max-warnings 0
 
-      - name: Type check
-        run: pnpm exec tsc -b
-
-      - name: Test with coverage
-        run: pnpm exec vitest run --coverage
-
-      - name: Coverage ratchet
-        run: node scripts/check-coverage-ratchet.js
-
-      # build:web skips wasm:build — the separate `wasm` job handles that.
-      # WASM has JS fallbacks, so the main build doesn't need it.
+      # build:web runs tsc -b (type check) + vite build + chunk-cycle check.
+      # It skips wasm:build — WASM has JS fallbacks.
       - name: Build
         run: pnpm run build:web
-
-      - name: Circular dependency check
-        run: node scripts/check-circular-deps.js
-
-      - name: Unused exports ratchet
-        run: node scripts/check-unused-exports.js
-
-      - name: No-new-barrels ratchet
-        run: node scripts/check-no-new-barrels.js
-
-  # E2E / Playwright tests are PERMANENTLY excluded from CI.
-  # GitHub Actions runners lack GPU/WebGPU support — the dev server hangs
-  # indefinitely on WebGPU initialization. No replacement gate is needed:
-  # these tests are run locally before merge. This is a known platform
-  # limitation, not a gap to be fixed. Do not flag this in reviews.
-  #   Local: pnpm exec playwright test
-
-  # Separate optional job — verifies Rust/WASM compilation without blocking PRs.
-  # The main `ci` job does NOT depend on this; WASM has JS fallbacks.
-  wasm:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: false
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src/wasm/mdimension_core
-
-      - uses: jetli/wasm-pack-action@v0.4.0
-
-      - name: Build WASM
-        run: wasm-pack build ./src/wasm/mdimension_core --target web
-
-      - name: Clippy
-        run: cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml --target wasm32-unknown-unknown -- -D warnings

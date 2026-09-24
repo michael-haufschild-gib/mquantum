@@ -16,6 +16,7 @@ import { useAtlasSweepController } from '@/components/sections/Analysis/useAtlas
 import { Button } from '@/components/ui/Button'
 import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 import { useQuantumnessAtlasStore } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -254,6 +255,50 @@ describe('useAtlasSweepController', () => {
 
     // The interval cleanup effect should fire; status display updates
     expect(screen.getByTestId('status')).toHaveTextContent('complete')
+  })
+
+  it('aborts a point that stalls during thermalization after its first sample', async () => {
+    // Regression: stall detection compared against lastSeenNRef, which stays
+    // 0 until the measurement window — once one thermalization sample had
+    // arrived, a diverging point (no further finite samples) hung forever.
+    useQuantumnessAtlasStore.getState().setConfig({
+      dimensions: [3],
+      lambdaMin: 1,
+      lambdaMax: 1,
+      lambdaSteps: 1,
+      gammas: [0],
+      evolveSamples: 50,
+      measureSamples: 1,
+    })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<TestHarness />)
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    expect(screen.getByTestId('status')).toHaveTextContent('running')
+
+    // One finite worker result arrives, then the simulation diverges.
+    act(() => {
+      useCoordinateEntanglementStore.setState({ longTimeN: 1 })
+    })
+    act(() => {
+      vi.advanceTimersByTime(400 * 80)
+    })
+
+    expect(useQuantumnessAtlasStore.getState().status).not.toBe('running')
+  })
+
+  it('does not abort as stalled while the simulation is paused', async () => {
+    configureMinimalSweep()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<TestHarness />)
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    act(() => {
+      useAnimationStore.getState().pause()
+      vi.advanceTimersByTime(400 * 80)
+    })
+    expect(useQuantumnessAtlasStore.getState().status).toBe('running')
+    act(() => {
+      useAnimationStore.getState().play()
+    })
   })
 
   it('leaves status idle when startSweep throws due to empty dimensions', () => {

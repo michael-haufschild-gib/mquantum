@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { MAX_DIMENSION } from '@/constants/dimension'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
+import { applySharedPml } from '@/rendering/webgpu/renderers/strategies/computeGridUtils'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('pauliSpinorSlice', () => {
@@ -119,13 +120,27 @@ describe('pauliSpinorSlice', () => {
     expect(gridSize[2]).toBe(128)
   })
 
-  it('setPauliGridSize clamps to [8, 256]', () => {
+  it('setPauliGridSize clamps to the shared-memory FFT range with an aligned floor', () => {
     const { setPauliGridSize } = useExtendedObjectStore.getState()
     setPauliGridSize([1, 1000, 64])
     const gridSize = useExtendedObjectStore.getState().pauliSpinor.gridSize
-    expect(gridSize[0]).toBe(8)
-    expect(gridSize[1]).toBe(256)
-    expect(gridSize[2]).toBe(64)
+    // 3D floor 4 keeps ≥ 64 sites (256-byte-aligned spin-down slice); 1000 → 128 (FFT max).
+    expect(gridSize).toEqual([4, 128, 64])
+    setPauliGridSize([2, 2, 2])
+    const tiny = useExtendedObjectStore.getState().pauliSpinor.gridSize
+    expect((tiny.reduce((a, b) => a * b, 1) * 8) % 256).toBe(0)
+  })
+
+  // Regression: the floor of 8 silently rounded the selector's 2 / 4 options
+  // back up to 8 (6D default 8⁶ could not be reduced), and 256 axes passed.
+  it('setPauliGridSize honours small axes and the total-site budget', () => {
+    const { setPauliGridSize, initializePauliForDimension } = useExtendedObjectStore.getState()
+    initializePauliForDimension(6)
+    setPauliGridSize(Array.from({ length: 6 }, () => 4))
+    expect(useExtendedObjectStore.getState().pauliSpinor.gridSize).toEqual(Array(6).fill(4))
+    setPauliGridSize([128, 128, 128])
+    const g = useExtendedObjectStore.getState().pauliSpinor.gridSize
+    expect(g.reduce((a, b) => a * b, 1)).toBeLessThanOrEqual(262144)
   })
 
   // === Visualization ===
@@ -261,5 +276,39 @@ describe('pauliSpinorSlice', () => {
 
     store.setPauliPmlTargetReflection(5)
     expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(0.999)
+  })
+})
+
+// Regression: the renderer resolves PML as `schroedinger.* ?? pauliSpinor.*`
+// (applySharedPml) and the shared fields always hold a value, so the Pauli
+// per-mode PML setters were silent no-ops on the running simulation.
+describe('pauliSpinorSlice PML setters reach the effective config', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
+  })
+
+  it('mirrors absorber enable / width / target reflection into the shared fields', () => {
+    const s = () => useExtendedObjectStore.getState()
+    const v0 = s().schroedingerVersion
+    s().setPauliAbsorberEnabled(false)
+    s().setPauliAbsorberWidth(0.33)
+    s().setPauliPmlTargetReflection(1e-3)
+
+    const effective = applySharedPml(s().pauliSpinor, s().schroedinger)
+    expect(effective.absorberEnabled).toBe(false)
+    expect(effective.absorberWidth).toBe(0.33)
+    expect(effective.pmlTargetReflection).toBe(1e-3)
+    expect(s().pauliSpinor.absorberEnabled).toBe(false)
+    expect(s().schroedingerVersion).toBe(v0 + 3)
+  })
+
+  it('keeps clamping and non-finite rejection for the mirrored fields', () => {
+    const s = () => useExtendedObjectStore.getState()
+    s().setPauliAbsorberWidth(9)
+    expect(s().schroedinger.absorberWidth).toBe(0.5)
+    s().setPauliAbsorberWidth(Number.NaN)
+    expect(s().schroedinger.absorberWidth).toBe(0.5)
+    s().setPauliPmlTargetReflection(-1)
+    expect(s().schroedinger.pmlTargetReflection).toBe(1e-12)
   })
 })

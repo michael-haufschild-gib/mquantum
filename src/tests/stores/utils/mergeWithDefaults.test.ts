@@ -1419,3 +1419,32 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(cp.b).toBeInstanceOf(Array)
   })
 })
+
+// Regression: an unknown quantumMode (removed/renamed mode in an old scene or
+// a hand-edited file) survived the merge verbatim, and SchroedingerControls'
+// mode switch threw `Unhandled quantum mode` during render.
+describe('mergeExtendedObjectStateForType — unknown quantum modes', () => {
+  it('falls back to the default mode for an unregistered quantumMode', () => {
+    for (const quantumMode of ['polytopeLegacy', 42, null]) {
+      const merged = mergeExtendedObjectStateForType(
+        { schroedinger: { quantumMode, scale: 1.25 } },
+        'schroedinger'
+      )
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+      expect(schroedinger.quantumMode).toBe(DEFAULT_SCHROEDINGER_CONFIG.quantumMode)
+      expect(schroedinger.scale).toBe(1.25)
+    }
+  })
+
+  it('keeps every registered Schrödinger mode (including the WDW ⊗ ζ suite)', () => {
+    for (const quantumMode of ['tdseDynamics', 'weilPositivity', 'modularKnot']) {
+      const merged = mergeExtendedObjectStateForType(
+        { schroedinger: { quantumMode } },
+        'schroedinger'
+      )
+      expect((merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).quantumMode).toBe(
+        quantumMode
+      )
+    }
+  })
+})

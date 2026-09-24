@@ -16,7 +16,7 @@ import {
   getNamedPresetStoreControls,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { isUniformComputeGridQuantumType } from '@/lib/geometry/registry'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
@@ -52,6 +52,7 @@ import type { QuantumModeStrategy, SchroedingerSnapshot } from '../strategies/ty
 import {
   applyHOMomentumTransform,
   computeCanonicalCompensation,
+  hoMomentumOmega,
   packBasisVectors,
   packCameraUniforms,
   packPrecomputedHOTerms,
@@ -74,6 +75,12 @@ export const PRECOMPUTED_TERM_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.preco
  * HO term capacity (MAX_TERMS) or vec4f layout ever changes.
  */
 export const PRECOMPUTED_TERM_BYTE_SIZE = SCHROEDINGER_LAYOUT.byteSize.precomputedTerm
+
+/**
+ * HO preset whose canonical compensation non-HO analytic modes use: the store
+ * default, which is the state those modes' density gains were tuned against.
+ */
+const COMPENSATION_REFERENCE_PRESET = DEFAULT_SCHROEDINGER_CONFIG.presetName
 
 import { quantizeBoundingRadius } from '../boundingRadiusQuantize'
 
@@ -435,13 +442,8 @@ export function computeSchroedingerUpdate(
 
   const inputs = readFrameInputs(ctx, config, dirtyInputs)
 
-  // Quantum preset generation
-  const needsPresetRegen = maybeRegeneratePreset(
-    state,
-    strategy,
-    inputs.schroedinger,
-    inputs.dimension
-  )
+  // Quantum preset generation (updates state.cachedPreset in place)
+  maybeRegeneratePreset(state, strategy, inputs.schroedinger, inputs.dimension)
 
   // Momentum scale
   const isPSpace = inputs.schroedinger?.momentumDisplayUnits === 'p'
@@ -465,9 +467,31 @@ export function computeSchroedingerUpdate(
   if (strategy.isComputeMode) {
     state.canonicalDensityCompensation = 1.0
     state.cachedPeakDensity = 1.0
-  } else if (needsPresetRegen && state.cachedPreset) {
+  } else if (state.cachedPreset) {
+    // Refreshed on every full update, not only on preset regeneration: the
+    // gain depends on the bounding radius (step-length estimate) and, in the
+    // HO momentum representation, on the rendered ω_k = s²/(ħ²ω). Keeping the
+    // value from the last regeneration made fieldScale / momentum-scale / ħ /
+    // hydrogen-n changes render the same state at a different brightness than
+    // a fresh load of it. (Cheap: ~500·D Hermite evaluations per store bump.)
+    // Only the harmonic oscillator renders the HO superposition. Every other
+    // analytic mode was calibrated against the default store preset, so it
+    // uses that fixed reference — otherwise invisible HO settings left over
+    // from an earlier session change its density gain by up to ~10x.
+    const compensationPreset =
+      inputs.quantumModeStr === 'harmonicOscillator'
+        ? inputs.schroedinger?.representation === 'momentum'
+          ? {
+              // Calibrate the state actually drawn (applyHOMomentumTransform).
+              ...state.cachedPreset,
+              omega: state.cachedPreset.omega.map((w) =>
+                hoMomentumOmega(w, hbar, inputs.schroedinger?.momentumScale ?? 1.0)
+              ),
+            }
+          : state.cachedPreset
+        : (getNamedPreset(COMPENSATION_REFERENCE_PRESET, inputs.dimension) ?? state.cachedPreset)
     const result = computeCanonicalCompensation(
-      state.cachedPreset,
+      compensationPreset,
       inputs.dimension,
       state.boundingRadius
     )
@@ -507,7 +531,13 @@ export function computeSchroedingerUpdate(
     inputs.quantumModeStr !== 'hydrogenND' &&
     inputs.quantumModeStr !== 'hydrogenNDCoupled'
   ) {
-    applyHOMomentumTransform(floatView, intView, inputs.dimension, hbar)
+    applyHOMomentumTransform(
+      floatView,
+      intView,
+      inputs.dimension,
+      hbar,
+      inputs.schroedinger?.momentumScale ?? 1.0
+    )
   }
 
   // Host-precompute term_k = c_k * exp(-i * E_k * t) AFTER the momentum

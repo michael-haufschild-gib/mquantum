@@ -320,7 +320,7 @@ export function exportWavefunctionSliceCSV(
 
   const lines = [`position_${axis},density`]
   for (let i = 0; i < gridSize; i++) {
-    const pos = sliceSamplePosition(i, gridSize, worldBound, source)
+    const pos = sliceSamplePosition(i, gridSize, worldBound)
     lines.push(`${pos},${data[i]}`)
   }
   return lines.join('\n')
@@ -335,21 +335,14 @@ export function exportWavefunctionSliceCSV(
  * shifts the tails outward by half a voxel and biases analytic comparisons
  * (e.g. Gaussian sigma fits) — visible for low-N grids.
  *
- * The TDSE/BEC lattice path keeps the legacy endpoint formula until the
- * site→position mapping there can be exported with the actual lattice
- * halfExtent (boundingRadius carries a LATTICE_BOUNDING_MARGIN inflation,
- * so neither voxel-centered nor /N quite matches yet).
+ * TDSE/BEC lattice site i sits at (i − N/2 + ½)·dx (tdseInit), which is the
+ * same cell-centred formula now that the strategy captures the slice with
+ * the lattice half-extent N·dx/2. The former endpoint formula over
+ * `boundingRadius` (max axis extent × LATTICE_BOUNDING_MARGIN 1.15)
+ * stretched every exported position by ≥ 15% and shifted it half a site.
  */
-function sliceSamplePosition(
-  i: number,
-  gridSize: number,
-  worldBound: number,
-  source: 'density' | 'wavefunction'
-): number {
-  if (source === 'density') {
-    return -worldBound + ((i + 0.5) * 2 * worldBound) / gridSize
-  }
-  return -worldBound + (2 * worldBound * i) / (gridSize - 1 || 1)
+function sliceSamplePosition(i: number, gridSize: number, worldBound: number): number {
+  return -worldBound + ((i + 0.5) * 2 * worldBound) / gridSize
 }
 
 // ─── JSON export ──────────────────────────────────────────────────────────
@@ -566,14 +559,8 @@ function buildOpenQuantumPayload(): Record<string, unknown> | null {
 }
 
 /** Build grid positions for a slice export — see {@link sliceSamplePosition}. */
-function buildGridPositions(
-  gridSize: number,
-  worldBound: number,
-  source: 'density' | 'wavefunction'
-): number[] {
-  return Array.from({ length: gridSize }, (_, i) =>
-    sliceSamplePosition(i, gridSize, worldBound, source)
-  )
+function buildGridPositions(gridSize: number, worldBound: number): number[] {
+  return Array.from({ length: gridSize }, (_, i) => sliceSamplePosition(i, gridSize, worldBound))
 }
 
 function appendWavefunctionSlices(payload: Record<string, unknown>): void {
@@ -582,7 +569,7 @@ function appendWavefunctionSlices(payload: Record<string, unknown>): void {
     payload.wavefunctionSlices = {
       gridSize: density.sliceGridSize,
       worldBound: density.sliceWorldBound,
-      positions: buildGridPositions(density.sliceGridSize, density.sliceWorldBound, 'density'),
+      positions: buildGridPositions(density.sliceGridSize, density.sliceWorldBound),
       x: Array.from(density.sliceX),
       y: density.sliceY ? Array.from(density.sliceY) : null,
       z: density.sliceZ ? Array.from(density.sliceZ) : null,
@@ -596,7 +583,7 @@ function appendWavefunctionSlices(payload: Record<string, unknown>): void {
       quantumMode: wfSlice.sliceSourceMode,
       gridSize: wfSlice.sliceGridSize,
       worldBound: wfSlice.sliceWorldBound,
-      positions: buildGridPositions(wfSlice.sliceGridSize, wfSlice.sliceWorldBound, 'wavefunction'),
+      positions: buildGridPositions(wfSlice.sliceGridSize, wfSlice.sliceWorldBound),
       density: Array.from(wfSlice.sliceData),
     }
   }

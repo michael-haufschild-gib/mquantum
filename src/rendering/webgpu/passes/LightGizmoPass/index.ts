@@ -529,6 +529,42 @@ export class LightGizmoPass extends WebGPUBasePass {
       return
     }
 
+    this.vertexCount = this.prepareFrameVertices(ctx)
+
+    // ---- Render ----
+    // The output is cleared even with nothing to draw: DebugOverlayPass
+    // composites this texture every frame gizmos are shown, so skipping the
+    // pass (e.g. after the last light is removed — MIN_LIGHTS is 0) left the
+    // previous frame's gizmos frozen on screen.
+    const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
+    if (!outputView) return
+
+    const passEncoder = ctx.beginRenderPass({
+      label: 'light-gizmo-render',
+      colorAttachments: [
+        {
+          view: outputView,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear' as const,
+          storeOp: 'store' as const,
+        },
+      ],
+    })
+
+    if (this.vertexCount > 0) {
+      passEncoder.setPipeline(this.renderPipeline)
+      passEncoder.setBindGroup(0, this.bindGroup)
+      passEncoder.setVertexBuffer(0, this.vertexBuffer)
+      passEncoder.draw(this.vertexCount)
+    }
+    passEncoder.end()
+  }
+
+  /**
+   * Build and upload this frame's gizmo vertices and view-projection matrix.
+   * @returns Number of vertices to draw (0 when there is nothing to show)
+   */
+  private prepareFrameVertices(ctx: WebGPURenderContext): number {
     // ---- Read stores ----
     const lighting = getStoreSnapshot<{
       lights?: LightSource[]
@@ -537,11 +573,11 @@ export class LightGizmoPass extends WebGPUBasePass {
       transformMode?: TransformMode
     }>(ctx, 'lighting')
 
-    if (!lighting?.showLightGizmos || !lighting.lights?.length) return
+    if (!lighting?.showLightGizmos || !lighting.lights?.length) return 0
 
     const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
-    if (!camera?.viewProjectionMatrix?.elements) return
+    if (!camera?.viewProjectionMatrix?.elements) return 0
 
     // ---- Extract camera data ----
     const vpElements = camera.viewProjectionMatrix.elements
@@ -578,46 +614,26 @@ export class LightGizmoPass extends WebGPUBasePass {
     // ---- Transform gizmo for selected light ----
     this.generateTransformGizmo(lighting, allVertices, camPos)
 
-    this.vertexCount = allVertices.length / VERTEX_STRIDE
-    if (this.vertexCount === 0) return
+    let vertexCount = allVertices.length / VERTEX_STRIDE
+    if (vertexCount === 0) return 0
 
     // ---- Upload to GPU ----
     if (allVertices.length > this.vertexUploadData.length) {
-      this.vertexCount = Math.floor(MAX_VERTEX_BUFFER_BYTES / VERTEX_STRIDE_BYTES)
+      vertexCount = Math.floor(MAX_VERTEX_BUFFER_BYTES / VERTEX_STRIDE_BYTES)
     }
-    const uploadCount = this.vertexCount * VERTEX_STRIDE
+    const uploadCount = vertexCount * VERTEX_STRIDE
     for (let i = 0; i < uploadCount; i++) {
       this.vertexUploadData[i] = allVertices[i]!
     }
-    this.device.queue.writeBuffer(this.vertexBuffer, 0, this.vertexUploadData, 0, uploadCount)
+    this.device!.queue.writeBuffer(this.vertexBuffer!, 0, this.vertexUploadData, 0, uploadCount)
 
     // Upload VP matrix
     for (let i = 0; i < 16; i++) {
       this.vpUploadData[i] = (vpElements[i] as number) ?? 0
     }
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, this.vpUploadData)
+    this.device!.queue.writeBuffer(this.uniformBuffer!, 0, this.vpUploadData)
 
-    // ---- Render ----
-    const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
-    if (!outputView) return
-
-    const passEncoder = ctx.beginRenderPass({
-      label: 'light-gizmo-render',
-      colorAttachments: [
-        {
-          view: outputView,
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: 'clear' as const,
-          storeOp: 'store' as const,
-        },
-      ],
-    })
-
-    passEncoder.setPipeline(this.renderPipeline)
-    passEncoder.setBindGroup(0, this.bindGroup)
-    passEncoder.setVertexBuffer(0, this.vertexBuffer)
-    passEncoder.draw(this.vertexCount)
-    passEncoder.end()
+    return vertexCount
   }
 
   /**

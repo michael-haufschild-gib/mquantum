@@ -183,3 +183,89 @@ describe('density grid resource config sanitization', () => {
     expect(destroy).toHaveBeenCalled()
   })
 })
+
+// Regression: the completion callback copied the whole postFrame snapshot back
+// onto the pass, so a refresh requested while mapAsync was pending (quantum
+// numbers changed → markDirty / world bound changed) was reset to false and
+// the density analysis never re-ran for the new state.
+describe('DensityGridComputePass readback completion', () => {
+  type PassInternals = {
+    device: GPUDevice | null
+    densityReadbackBuffer: GPUBuffer | null
+    readbackInFlight: boolean
+    readbackPendingSubmit: boolean
+    shouldRefreshDistribution: boolean
+  }
+
+  it('keeps a refresh requested while the readback was in flight', async () => {
+    const pass = new DensityGridComputePass({ dimension: 3 })
+    const internals = pass as unknown as PassInternals
+    internals.device = {} as GPUDevice
+    internals.densityReadbackBuffer = createMockState().densityReadbackBuffer
+    internals.readbackInFlight = true
+    internals.readbackPendingSubmit = true
+    internals.shouldRefreshDistribution = false
+
+    pass.postFrame()
+    pass.markDirty() // parameter change lands during the async map
+    await flushMicrotasks()
+
+    expect(internals.readbackInFlight).toBe(false)
+    expect(internals.shouldRefreshDistribution).toBe(true)
+  })
+
+  it('still requests a refresh after a failed map', async () => {
+    const pass = new DensityGridComputePass({ dimension: 3 })
+    const internals = pass as unknown as PassInternals
+    const buffer = createMockState().densityReadbackBuffer!
+    ;(buffer.mapAsync as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      Promise.reject(new Error('map failed'))
+    )
+    internals.device = {} as GPUDevice
+    internals.densityReadbackBuffer = buffer
+    internals.readbackInFlight = true
+    internals.readbackPendingSubmit = true
+    internals.shouldRefreshDistribution = false
+
+    pass.postFrame()
+    await flushMicrotasks()
+
+    expect(internals.readbackInFlight).toBe(false)
+    expect(internals.shouldRefreshDistribution).toBe(true)
+  })
+})
+
+// A refresh deferred while a readback was in flight must still be serviced on
+// a later frame even though a static grid never recomputes (needsUpdate is
+// false): previously it waited for the next parameter change.
+describe('DensityGridComputePass deferred refresh service', () => {
+  it('queues the distribution copy on a static frame without re-dispatching the grid', () => {
+    const pass = new DensityGridComputePass({ dimension: 3, quantumMode: 'hydrogenND' })
+    const internals = pass as unknown as Record<string, unknown>
+    internals.computePipeline = {}
+    internals.computeBindGroup = {}
+    internals.needsRecompute = false
+    internals.lastDimension = 3
+    internals.lastQuantumMode = 'hydrogenND'
+    internals.densityTexture = {}
+    internals.densityReadbackBuffer = createMockState().densityReadbackBuffer
+    internals.readbackInFlight = false
+    internals.readbackPendingSubmit = false
+    internals.shouldRefreshDistribution = true
+
+    const copyTextureToBuffer = vi.fn()
+    const beginComputePass = vi.fn()
+    const ctx = {
+      encoder: { copyTextureToBuffer },
+      beginComputePass,
+      frame: { time: 0, stores: { animation: { accumulatedTime: 0 } } },
+    } as unknown as Parameters<DensityGridComputePass['execute']>[0]
+
+    pass.execute(ctx)
+
+    expect(beginComputePass).not.toHaveBeenCalled()
+    expect(copyTextureToBuffer).toHaveBeenCalledTimes(1)
+    expect(internals.readbackPendingSubmit).toBe(true)
+    expect(internals.shouldRefreshDistribution).toBe(false)
+  })
+})

@@ -24,6 +24,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  sharedMemFFTWorkgroupCount,
   type SiteDispatch,
 } from '../computePassUtils'
 import { dispatchDiagnostics as extDispatchDiagnostics } from '../TDSEComputePassDispatchers'
@@ -49,6 +50,8 @@ import { runVortexDetection, type VortexDetectState } from '../TDSEVortexDetect'
 export interface EvolutionFrameState {
   simTime: number
   stepAccumulator: number
+  /** Output: evolution steps actually executed this frame (0 on fractional-speed idle frames). */
+  stepsTaken?: number
 }
 
 /** Immutable resources needed by the evolution loop. */
@@ -195,6 +198,7 @@ export function runStrangEvolution(
     state.stepAccumulator += scaledSteps
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
+    state.stepsTaken = curvedSteps
     const curvedAbsorberActive = absorberEnabled
     const curvedPerStepRenorm = config.imaginaryTimeEnabled || stochasticActive
     // Per-step RK4 stage-time patch for time-dependent metrics (deSitter).
@@ -317,6 +321,7 @@ export function runStrangEvolution(
   state.stepAccumulator += scaledSteps
   const stepsThisFrame = Math.floor(state.stepAccumulator)
   state.stepAccumulator -= stepsThisFrame
+  state.stepsTaken = stepsThisFrame
 
   // Pre-compute stochastic uniforms for all steps (staging buffer pattern).
   // Must happen before the loop so each step gets independent random data.
@@ -377,7 +382,7 @@ export function runStrangEvolution(
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         const axisDim = config.gridSize[d]!
         strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        strangPass.dispatchWorkgroups(sharedMemFFTWorkgroupCount(res.totalSites, axisDim))
         fftSlot++
       }
       // 4. Kinetic propagator in k-space.
@@ -399,7 +404,7 @@ export function runStrangEvolution(
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         const axisDim = config.gridSize[d]!
         strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        strangPass.dispatchWorkgroups(sharedMemFFTWorkgroupCount(res.totalSites, axisDim))
         fftSlot++
       }
       // 6+7. Fused unpack + second half-step potential (reads density for BEC nonlinearity)

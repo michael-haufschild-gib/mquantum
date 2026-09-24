@@ -186,3 +186,12 @@ describe('purity and entropy relationship', () => {
     }
   })
 })
+
+describe('groundPopulation with an explicit ground index', () => {
+  it('reads ρ_gg rather than ρ_00', () => {
+    const rho = densityMatrixFromCoefficients([0.6, 0, 0.8], [0, 0, 0], 3)
+    expect(groundPopulation(rho, 2)).toBeCloseTo(0.64, 12)
+    expect(groundPopulation(rho, 0)).toBeCloseTo(0.36, 12)
+    expect(computeMetrics(rho, false, 0, 2).groundPopulation).toBeCloseTo(0.64, 12)
+  })
+})

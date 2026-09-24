@@ -85,7 +85,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
             <Slider
               data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-slider-83-13"
               label="Well Depth V₀"
-              tooltip="Height (barrier) or depth (well) of the potential in energy units. Controls tunneling probability and bound state count."
+              tooltip="Barrier height V₀ in energy units: the slab height for Barrier, the central hump between the two minima for Double Well. Controls the tunneling probability."
               value={wellDepth}
               onChange={onWellDepthChange}
               min={0}
@@ -96,7 +96,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
             <Slider
               data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-slider-93-13"
               label="Well Width"
-              tooltip="Spatial extent of the barrier or well region. Wider barriers reduce tunneling; wider wells support more bound states."
+              tooltip="Barrier: slab thickness along the first axis. Double Well: separation of the two minima (at x = ±width/2), V = V₀((x² − a²)/a²)². Wider barriers / separations reduce tunneling."
               value={wellWidth}
               onChange={onWellWidthChange}
               min={0.01}

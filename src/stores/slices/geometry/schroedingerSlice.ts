@@ -17,6 +17,7 @@ import { sanitizeTdseLoadedFields } from '@/lib/geometry/extended/tdse'
 import {
   createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
+  RAYMARCH_QUALITY_TO_SAMPLES,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
   type SchroedingerConfig,
@@ -290,6 +291,11 @@ export const createSchroedingerSlice: StateCreator<
             hermiteCocycleInflationEnabled: false,
             ...presetControls.visualOverrides,
           }
+          // The renderer reads sampleCount, not raymarchQuality; keep them in
+          // lock-step like setSchroedingerRaymarchQuality does, otherwise a
+          // preset's quality override only changed the dropdown label.
+          const quality = presetControls.visualOverrides?.raymarchQuality
+          if (quality) updates.sampleCount = RAYMARCH_QUALITY_TO_SAMPLES[quality]
           if (presetControls.colorAlgorithm)
             useAppearanceStore.getState().setColorAlgorithm(presetControls.colorAlgorithm)
         }

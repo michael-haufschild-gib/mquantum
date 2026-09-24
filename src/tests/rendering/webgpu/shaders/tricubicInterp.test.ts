@@ -2,7 +2,7 @@
  * Tests for Catmull-Rom (tricubic) interpolation utilities.
  *
  * Validates the JS reference of Catmull-Rom basis weights against known
- * analytical properties: partition of unity, interpolation, cubic reproduction.
+ * analytical properties: partition of unity, interpolation, quadratic precision.
  * Also tests the computeNeedsTricubic threshold logic.
  */
 
@@ -165,15 +165,17 @@ describe('catmullRomInterp1D', () => {
     }
   })
 
-  it('reproduces cubic polynomials on a periodic grid', () => {
+  it('matches cubic polynomials at knot midpoints (t = ½ equals the 4-point Lagrange stencil)', () => {
     const N = 8
     // f(x) = (x/N)³ sampled at integer points (periodic cubic)
     const values: number[] = []
     for (let i = 0; i < N; i++) {
       values.push((i / N) ** 3)
     }
-    // Catmull-Rom should reproduce cubics between any two adjacent knots
-    // Test at mid-knots (avoiding boundary periodicity effects)
+    // Catmull-Rom has quadratic precision only (see the "does NOT reproduce
+    // cubics" test); at t = ½ its weights (−1/16, 9/16, 9/16, −1/16) coincide
+    // with cubic Lagrange interpolation, so cubics are exact there and only
+    // there. Test at mid-knots (avoiding boundary periodicity effects).
     for (let i = 1; i < N - 2; i++) {
       const t = 0.5
       const coordF = i + t

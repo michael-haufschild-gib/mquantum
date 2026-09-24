@@ -217,6 +217,16 @@ export function initVortexDetect(
 }
 
 /**
+ * Vortex-detection vacuum floor, as a fraction of the current peak density:
+ * plaquettes whose four corners all lie at or below it are skipped because
+ * their phases are round-off / halo noise. GPU-measured on the default 64³
+ * BEC: a TF ground state reads 0 (was ~2.5·10⁴ with no cut, ~10³ balanced ±
+ * pairs at 1e-6 once the edge sheds waves); a charge-1 imprint reads ~44 +1
+ * plaquettes — one per z-layer of the dense cloud.
+ */
+export const VORTEX_VACUUM_DENSITY_FRACTION = 1e-3
+
+/**
  * Dispatch vortex detection compute passes, copy result to staging, and
  * schedule async readback. Uses onSubmittedWorkDone + mapAsync pattern
  * matching TDSEDiagnosticsReadback to avoid staging-buffer-while-mapped errors.
@@ -249,8 +259,10 @@ export function dispatchAndReadbackVortexDetect(
   u32[0] = totalSites
   u32[1] = state.numWorkgroups
   u32[2] = latticeDim
-  f32[3] = 0.05 // density threshold: 5% of max
-  f32[4] = maxDensity
+  // Vacuum floor: plaquettes whose four corners are all ≤ 1e-3·maxDensity
+  // carry round-off phases and are skipped (see vortexDetect.wgsl).
+  f32[3] = VORTEX_VACUUM_DENSITY_FRACTION
+  f32[4] = Number.isFinite(maxDensity) && maxDensity > 0 ? maxDensity : 0
   device.queue.writeBuffer(state.uniformBuffer, 0, data)
 
   // Pass 1: reduce

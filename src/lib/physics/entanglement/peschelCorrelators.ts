@@ -19,13 +19,19 @@ import { M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
  * (`σ_φ² ∝ 1/(2 ω_0)` blows up otherwise). For Peschel entropy the
  * situation is different: `1/(2 ω_0)` enters `X_{ij}` as a rank-1
  * contribution that — at the lattice sizes used here (`N ≤ 256`) — is
- * comparable in magnitude to the genuine CFT signal, and it crushes
- * the `log(L)` law down to `c_eff ≈ 0.46` for `N = 128`. The probe
- * therefore uses a much smaller IR regulator (`1e-6`) which makes the
- * zero-mode contribution negligibly small and recovers the expected
- * `c ≈ 1` Calabrese-Cardy slope. This is a deliberate scope-local
- * deviation from the Klein-Gordon sampler's regularization; the rest
- * of the free-scalar pipeline still uses `M_FLOOR`.
+ * comparable in magnitude to the genuine CFT signal: the floor acts as a
+ * mass with correlation length ~ N and crushes the `log(L)` law (fitted
+ * `c_eff ≈ 0.6` for `N = 128`). The probe therefore uses a much smaller
+ * IR regulator (`1e-6`). That does NOT make the zero mode small — it
+ * becomes a huge rank-1 term (`X_00 ≈ 3.9e3` at `N = 128`) — but its
+ * entropy is an almost L-independent offset (≈ 4.2–4.5 nats over
+ * `L = 4..64` at `N = 128`, growing like ½·ln(1/ε)), so the log-slope
+ * recovers the expected `c ≈ 1` Calabrese-Cardy value. Absolute `S(L)`
+ * of a massless run therefore carries this regulator-dependent constant
+ * (the massless periodic boson's zero mode is genuinely IR-divergent).
+ * This is a deliberate scope-local deviation from the Klein-Gordon
+ * sampler's regularization; the rest of the free-scalar pipeline still
+ * uses `M_FLOOR`.
  */
 export const ENTROPY_IR_FLOOR = 1e-6
 const MAX_PESCHEL_MATRIX_ENTRIES = 2 ** 20

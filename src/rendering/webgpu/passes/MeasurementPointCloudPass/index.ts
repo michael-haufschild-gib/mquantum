@@ -161,12 +161,30 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     // the newest measurement the *dimmest* and the oldest the *brightest*,
     // which is the opposite of what a "fading trail" visualization wants.
     const denom = Math.max(this.pointCount - 1, 1)
+    // Measurement positions are object-local (lattice) coordinates, while
+    // the volume is drawn through modelMatrix = uniformScale·I + position
+    // (packCameraUniforms). Apply the same transform, otherwise the dots
+    // drift off the density whenever a scene preset restores a non-default
+    // object scale or offset.
+    const transform = getStoreSnapshot<{ uniformScale?: number; position?: number[] }>(
+      ctx,
+      'transform'
+    )
+    const rawScale = transform?.uniformScale
+    const scale =
+      typeof rawScale === 'number' && Number.isFinite(rawScale) ? Math.max(rawScale, 1e-6) : 1
+    const offset = transform?.position ?? [0, 0, 0]
+    const finiteOffset = (v: number | undefined): number =>
+      typeof v === 'number' && Number.isFinite(v) ? v : 0
+    const ox = finiteOffset(offset[0])
+    const oy = finiteOffset(offset[1])
+    const oz = finiteOffset(offset[2])
     for (let i = 0; i < this.pointCount; i++) {
       const pos = positions[startIdx + i]!.position
       const age = (this.pointCount - 1 - i) / denom
-      this.uploadData[i * 4] = pos[0] ?? 0
-      this.uploadData[i * 4 + 1] = pos[1] ?? 0
-      this.uploadData[i * 4 + 2] = pos[2] ?? 0
+      this.uploadData[i * 4] = scale * (pos[0] ?? 0) + ox
+      this.uploadData[i * 4 + 1] = scale * (pos[1] ?? 0) + oy
+      this.uploadData[i * 4 + 2] = scale * (pos[2] ?? 0) + oz
       this.uploadData[i * 4 + 3] = age
     }
     ctx.device.queue.writeBuffer(this.positionBuffer!, 0, this.uploadData, 0, this.pointCount * 4)
@@ -176,6 +194,9 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     this.uniformData[16] = POINT_SIZE
     this.uniformData[17] = OPACITY
     new Uint32Array(this.uniformData.buffer)[18] = this.pointCount
+    const width = ctx.size?.width ?? 0
+    const height = ctx.size?.height ?? 0
+    this.uniformData[19] = width > 0 && height > 0 ? width / height : 1
     ctx.device.queue.writeBuffer(this.uniformBuffer!, 0, this.uniformData)
 
     // Begin render pass with depth attachment

@@ -49,8 +49,15 @@ export const PageCurveSvg = React.memo(function PageCurveSvg({
   lastIslandRadius,
   dMaxFrac,
 }: PageCurveSvgProps) {
+  // The store latches t_Page once its crossing scrolls out of the ring buffer,
+  // so it can predate the plotted window; only draw the guide while it lies
+  // inside [tMin, tMax] (it would otherwise land in the axis-label gutter or
+  // off-canvas). The island guide below still keys off the latched value.
   const tPagePixel =
-    snapshot.tPage !== null && snapshot.tMax > snapshot.tMin
+    snapshot.tPage !== null &&
+    snapshot.tMax > snapshot.tMin &&
+    snapshot.tPage >= snapshot.tMin &&
+    snapshot.tPage <= snapshot.tMax
       ? PAD_L +
         ((snapshot.tPage - snapshot.tMin) / (snapshot.tMax - snapshot.tMin)) *
           (PAGE_CURVE_WIDTH - PAD_L - PAD_R)
@@ -147,6 +154,7 @@ export const PageCurveSvg = React.memo(function PageCurveSvg({
           stroke="var(--color-text-secondary)"
           strokeDasharray="2 3"
           strokeWidth={1}
+          data-testid="hawking-tpage-line"
         />
       )}
       {/* Island extent guide — only after t_Page and when the toggle is on. */}

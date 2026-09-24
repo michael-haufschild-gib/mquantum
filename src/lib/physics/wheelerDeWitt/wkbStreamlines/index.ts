@@ -13,16 +13,20 @@
  * Hamilton-Jacobi phase is simply `S_phys = ℏ · arg(χ)` — the `a^{3/2}`
  * Jacobi factor affects `R` but not `arg(χ)`.
  *
- * This module integrates classical trajectories along the flow
- * `q̇ = ∇_q S_vis` of a *visualisation* phase field
+ * This module integrates classical trajectories along the *visualisation*
+ * flow
  *
- *   `S_vis(a, φ) = a^{3/2} · arg(χ)`.
+ *   `q̇ = a^{3/2} · ∇_q arg(χ)`,
  *
+ * i.e. the Hamilton–Jacobi phase gradient rescaled by `a^{3/2}`
+ * ("`S_vis = a^{3/2}·arg χ`" with the weight applied to the gradient).
  * The `a^{3/2}` rescaling is a rendering choice, not a physical
- * correction: multiplying by `a^{3/2}` steepens the gradient along the
- * scale-factor axis relative to the inflaton axes, which pushes
- * streamlines out of the near-`a_min` bunching region and across the
- * Lorentzian interior. Physical WKB streamlines (`S_phys`) are available
+ * correction: it steepens the gradient along the scale-factor axis
+ * relative to the inflaton axes, which pushes streamlines out of the
+ * near-`a_min` bunching region and across the Lorentzian interior. The
+ * weight multiplies `∇arg χ` only — the product-rule term
+ * `(3/2)·a^{1/2}·arg χ` of a literal `∇(a^{3/2}·arg χ)` depends on the
+ * 2π branch and the global phase of χ, so it is not part of the flow. Physical WKB streamlines (`S_phys`) are available
  * via `extractWkbPhase` in `srmt/wkbPhase.ts`; this module renders the
  * rescaled version because it reads better on screen.
  *
@@ -252,14 +256,12 @@ function gradS(
   }
   const aCur = aMin + ia * da
   const aCur3half = Math.pow(aCur, 1.5)
-  const aCurHalf = Math.sqrt(aCur)
 
   // Read raw χ phases first. `wrappedDiff` is only defined modulo 2π on
   // raw angles; applying it after the a^{3/2} scaling shifts the branch
   // spacing away from 2π and lets the `a`-gradient flip sign near the
   // ±π cut. Compute the central differences on the raw phases, then
-  // rebuild ∂_a S_vis via the product rule.
-  const argCur = sampleArg(table, ia, i1, i2)
+  // apply the a^{3/2} display weight.
   const argNextA = sampleArg(table, ia + 1, i1, i2)
   const argPrevA = sampleArg(table, ia - 1, i1, i2)
   const argNext1 = sampleArg(table, ia, i1 + 1, i2)
@@ -267,9 +269,12 @@ function gradS(
   const argNext2 = sampleArg(table, ia, i1, i2 + 1)
   const argPrev2 = sampleArg(table, ia, i1, i2 - 1)
 
-  // ∂ₐ S_vis = d/da[a^{3/2} · arg] = (3/2)·a^{1/2}·arg + a^{3/2}·∂ₐ arg
+  // v_a = a^{3/2}·∂ₐ arg. The literal product-rule term (3/2)·a^{1/2}·arg
+  // is dropped: arg is only defined modulo 2π, so that term jumped by
+  // 3π·a^{1/2} at every branch cut and shifted with χ's global phase —
+  // near a_min it rivalled a^{3/2}·∂ₐ arg and could reverse the flow.
   const dArgDa = wrappedDiff(argNextA, argPrevA) / (2 * da)
-  const dSdaPhys = 1.5 * aCurHalf * argCur + aCur3half * dArgDa
+  const dSdaPhys = aCur3half * dArgDa
   const dSda = dSdaPhys / da
 
   // φ-direction factors are a-constant, so product rule gives pure scaling.

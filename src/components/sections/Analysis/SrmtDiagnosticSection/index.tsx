@@ -171,7 +171,7 @@ const SrmtDiagnosticContent: React.FC = React.memo(() => {
           <div
             className="text-2xs font-mono"
             style={{
-              color: srmtEnabled ? 'var(--text-tertiary)' : 'var(--text-disabled)',
+              color: srmtEnabled ? 'var(--text-tertiary)' : 'var(--text-muted)',
             }}
             data-testid="wdw-srmt-cut-coord-readout"
           >

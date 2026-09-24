@@ -76,6 +76,12 @@ fn getSpotAttenuation(light: LightData, lightToFrag: vec3f) -> f32 {
   let cosAngle = dot(lightToFrag, normDir);
   let cosOuter = light.params.z;  // spotCosOuter
   let cosInner = light.params.y;  // spotCosInner
+  // Penumbra 0 (allowed by the UI) packs cosInner == cosOuter; smoothstep with
+  // equal edges divides by zero (undefined in GLSL, indeterminate on some WGSL
+  // backends — NaN at the rim can then bloom). Use the intended hard edge.
+  if (cosInner - cosOuter <= 1e-6) {
+    return select(0.0, 1.0, cosAngle >= cosOuter);
+  }
   return smoothstep(cosOuter, cosInner, cosAngle);
 }
 

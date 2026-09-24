@@ -9,6 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { computeStrides } from '@/lib/math/ndArray'
 import {
   useWavefunctionSliceStore,
   type WavefunctionSliceSourceMode,
@@ -87,8 +88,9 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
  * @param ctx - Render context (device + encoder)
  * @param state - Shared save/load state with buffer references
  * @param axis - Axis to slice along ('x', 'y', or 'z')
- * @param gridSize - Per-dimension grid sizes
- * @param worldBound - World-space half-extent
+ * @param gridSize - Per-axis lattice sizes (exactly `latticeDim` entries)
+ * @param worldBound - Lattice half-extent N·dx/2 of the slice axis (the
+ *                     export maps sample i to (i − N/2 + ½)·dx from it)
  * @param sourceMode - Quantum mode that scheduled this capture
  */
 export function requestSliceCapture(
@@ -130,38 +132,9 @@ export function requestSliceCapture(
       await staging.mapAsync(GPUMapMode.READ)
 
       const interleaved = new Float32Array(staging.getMappedRange())
-
-      // Extract a 1D slice through the center of the grid
-      const dims = gridSize.length
-      const nx = gridSize[0] ?? 1
-      const ny = dims > 1 ? (gridSize[1] ?? 1) : 1
-      const nz = dims > 2 ? (gridSize[2] ?? 1) : 1
-      const cx = Math.floor(nx / 2)
-      const cy = Math.floor(ny / 2)
-      const cz = Math.floor(nz / 2)
-
-      const axisMap = { x: 0, y: 1, z: 2 }
-      const axisIdx = axisMap[axis]
-      const sliceSize = gridSize[axisIdx] ?? 1
-      const sliceData = new Float32Array(sliceSize)
-
-      for (let i = 0; i < sliceSize; i++) {
-        let ix = cx,
-          iy = cy,
-          iz = cz
-        if (axisIdx === 0) ix = i
-        else if (axisIdx === 1) iy = i
-        else iz = i
-
-        const flatIdx = ix * ny * nz + iy * nz + iz
-        if (flatIdx < totalSites) {
-          // Interleaved layout: [re0, im0, re1, im1, ...].
-          const r = interleaved[2 * flatIdx]!
-          const j = interleaved[2 * flatIdx + 1]!
-          const density = r * r + j * j
-          sliceData[i] = Number.isFinite(density) && density >= 0 ? density : 0
-        }
-      }
+      const axisIdx = { x: 0, y: 1, z: 2 }[axis]
+      const sliceData = extractCenteredDensitySlice(interleaved, gridSize, axisIdx, totalSites)
+      const sliceSize = sliceData.length
 
       staging.unmap()
       staging.destroy()
@@ -181,6 +154,47 @@ export function requestSliceCapture(
       state.saveMappingInFlight = false
     })
   return true
+}
+
+/**
+ * Extract |ψ|² along lattice axis `axisIdx` through the centre site of every
+ * other axis, from the merged interleaved ψ buffer ([Re, Im, …] per site).
+ * Indexes with the TDSE row-major layout over ALL lattice axes (last axis
+ * fastest, stride_d = Π_{k>d} N_k). The former hand-rolled
+ * `ix·ny·nz + iy·nz + iz` was exact only for D ≤ 3: on a 4D+ lattice it
+ * pinned the real axis 0 at site 0 (the lattice edge) and shifted every
+ * other axis by one.
+ *
+ * @param interleaved - Mapped ψ buffer, length ≥ 2·totalSites
+ * @param gridSize - Per-axis lattice sizes (exactly `latticeDim` entries)
+ * @param axisIdx - Slice axis; an axis beyond the lattice yields one sample
+ * @param totalSites - Site count guarding reads past the buffer
+ * @returns Density samples along the axis
+ */
+export function extractCenteredDensitySlice(
+  interleaved: Float32Array,
+  gridSize: readonly number[],
+  axisIdx: number,
+  totalSites: number
+): Float32Array {
+  const strides = computeStrides(gridSize)
+  let base = 0
+  for (let d = 0; d < gridSize.length; d++) {
+    if (d !== axisIdx) base += Math.floor((gridSize[d] ?? 1) / 2) * strides[d]!
+  }
+  const onLattice = axisIdx < gridSize.length
+  const sliceSize = onLattice ? (gridSize[axisIdx] ?? 1) : 1
+  const stride = onLattice ? strides[axisIdx]! : 0
+  const sliceData = new Float32Array(sliceSize)
+  for (let i = 0; i < sliceSize; i++) {
+    const flatIdx = base + i * stride
+    if (flatIdx >= totalSites) continue
+    const r = interleaved[2 * flatIdx]!
+    const j = interleaved[2 * flatIdx + 1]!
+    const density = r * r + j * j
+    sliceData[i] = Number.isFinite(density) && density >= 0 ? density : 0
+  }
+  return sliceData
 }
 
 /**

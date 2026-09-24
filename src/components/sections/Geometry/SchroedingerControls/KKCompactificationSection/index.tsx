@@ -205,7 +205,7 @@ interface KKEnergyDiagramProps {
 
 /** Palette for per-dimension level colors */
 const DIM_COLORS = [
-  'var(--accent)',
+  'var(--color-accent)',
   'var(--dirac-particle)',
   'var(--chart-pass-1)',
   'var(--chart-pass-3)',

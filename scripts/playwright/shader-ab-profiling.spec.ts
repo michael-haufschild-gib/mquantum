@@ -25,6 +25,7 @@ import {
   gotoMode,
   requireWebGPU,
   waitForFrameAdvance,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -100,7 +101,8 @@ async function measureSchroedinger(page: import('@playwright/test').Page) {
   const measureStart = await getFrameCount(page)
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
   // Wait for perf metrics to have valid data
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
       return mod.usePerformanceMetricsStore.getState().fps > 0

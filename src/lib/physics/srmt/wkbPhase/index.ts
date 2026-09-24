@@ -15,7 +15,7 @@
  * `arg(χ) = arg(Ψ)` unconditionally — the physical phase does not
  * acquire an `a^{3/2}` rescaling.
  *
- * (A rescaled visualisation phase `S_vis = a^{3/2} · arg(χ)` is used in
+ * (A rescaled visualisation flow `q̇ = a^{3/2} · ∇arg(χ)` is used in
  * `wheelerDeWitt/wkbStreamlines.ts` to push streamlines out of the
  * near-`a_min` bunching region; that is a rendering choice, not the
  * physical `S`. Distinguish the two carefully.)

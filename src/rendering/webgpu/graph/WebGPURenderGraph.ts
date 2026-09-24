@@ -439,6 +439,7 @@ export class WebGPURenderGraph {
     const timedPassPhases = this._frameTimedPassPhases
     timedPassPhases.length = 0
     const canCollectGpuTimings = collectDetailedStats && this.timestampCollector.canCollect()
+    const maxTimedPasses = this.timestampCollector.getMaxTimedPasses()
 
     const now = Date.now()
     const shouldLog = import.meta.env.DEV && (!this._lastPassLog || now - this._lastPassLog > 1000)
@@ -487,7 +488,10 @@ export class WebGPURenderGraph {
         writtenByEnabledPass.add(output.resourceId)
       }
 
-      if (canCollectGpuTimings) {
+      // Cap at the query-set capacity: an out-of-range timestampWrites index
+      // invalidates the frame's whole encoder, so passes past the cap simply
+      // run un-instrumented.
+      if (canCollectGpuTimings && timestampIndex < maxTimedPasses) {
         ctx.setPassTimestampWrites(this.timestampCollector.getQuerySet()!, timestampIndex * 4)
       }
 

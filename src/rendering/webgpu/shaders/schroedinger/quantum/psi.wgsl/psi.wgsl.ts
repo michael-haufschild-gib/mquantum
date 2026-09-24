@@ -231,7 +231,15 @@ fn evalHydrogenNDMomentumPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
   let psiSpatial = evalHydrogenNDMomentumSpatial(xND, uniforms);
   let nf = f32(max(uniforms.principalN, 1));
   let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
-  let energy = -0.5 / (nEff * nEff);
+  // Same eigenvalue as the position representation (hydrogenNDTimeEvolutionND):
+  // the extra-dimension HO factors contribute Σ ω_j (n_j + ½). Omitting them
+  // made the momentum view's phase rotate at the wrong rate.
+  var extraEnergy = 0.0;
+  for (var i = 0; i < 8; i++) {
+    if (i >= ACTUAL_DIM - 3) { break; }
+    extraEnergy += getExtraDimOmega(uniforms, i) * (f32(getExtraDimN(uniforms, i)) + 0.5);
+  }
+  let energy = -0.5 / (nEff * nEff) + extraEnergy;
   return cmul(psiSpatial, cexp_i(-energy * t));
 }
 

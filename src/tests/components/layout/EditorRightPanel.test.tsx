@@ -77,3 +77,43 @@ describe('EditorRightPanel tab layout', () => {
     expect(screen.queryByTestId('export-wf-slice-csv')).not.toBeInTheDocument()
   }, 15_000)
 })
+
+// Regression: the capture button was hidden once a slice existed, and nothing
+// resets the slice store — so a second (later-time) capture was impossible.
+describe('EditorRightPanel wavefunction slice recapture', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useExtendedObjectStore.getState().reset()
+    useWavefunctionSliceStore.getState().reset()
+    useGeometryStore.setState({ dimension: 3, objectType: 'schroedinger' })
+  })
+
+  it('keeps a recapture action next to the export once a slice was captured', async () => {
+    const user = userEvent.setup()
+    useExtendedObjectStore.setState((s) => ({
+      schroedinger: { ...s.schroedinger, quantumMode: 'tdseDynamics' },
+    }))
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([0.2, 0.8, 0.2]),
+      axis: 'x',
+      sourceMode: 'tdseDynamics',
+      gridSize: 3,
+      worldBound: 1,
+    })
+
+    render(<EditorRightPanel />)
+    await user.click(screen.getByRole('tab', { name: /analysis/i }))
+    expect(
+      await screen.findByTestId('analysis-section', undefined, { timeout: 10_000 })
+    ).toBeInTheDocument()
+    await user.click(
+      await screen.findByTestId('data-export-group-header', undefined, { timeout: 10_000 })
+    )
+
+    expect(screen.getByTestId('export-wf-slice-csv')).toBeInTheDocument()
+    const capture = screen.getByTestId('capture-slice')
+    expect(capture).toHaveTextContent(/Recapture/)
+    await user.click(capture)
+    expect(useWavefunctionSliceStore.getState().captureRequested).toBe(true)
+  }, 15_000)
+})

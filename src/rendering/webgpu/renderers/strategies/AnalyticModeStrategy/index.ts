@@ -530,16 +530,21 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     }
   }
 
-  /** Compute Wigner grid x-range, accounting for hydrogen radial center. */
+  /**
+   * Compute Wigner grid x-range, accounting for hydrogen radial center.
+   * `n` / `a0` must be the packed `principalN` / `bohrRadius` uniforms: the
+   * fragment shader rebuilds the same [xMin, xMax] from them to map UVs into
+   * the cache, so reading the raw (unsanitized) store fields here could
+   * misregister the cached texture.
+   */
   private computeWignerGridRange(
     xRange: number,
     aspect: number,
     isHydrogenRadial: boolean,
-    schroedinger: Partial<import('@/lib/geometry/extended/types').SchroedingerConfig> | undefined
+    n: number,
+    a0: number
   ): { xMin: number; xMax: number } {
     if (isHydrogenRadial) {
-      const n = schroedinger?.principalQuantumNumber ?? 2
-      const a0 = schroedinger?.bohrRadiusScale ?? 1.0
       const rCenter = n * n * a0
       return { xMin: Math.max(0, rCenter - xRange * aspect), xMax: rCenter + xRange * aspect }
     }
@@ -592,7 +597,8 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
       xRange,
       resolveFiniteAspect(ctx.size.width, ctx.size.height),
       isHydrogenRadial,
-      schroedinger
+      shared.schroedingerIntView[I.principalN] ?? 1,
+      shared.schroedingerFloatView[I.bohrRadius] ?? 1
     )
     wignerPass.updateGridParams(ctx.device, xMin, xMax, -pRange, pRange)
 

@@ -15,6 +15,7 @@
  */
 
 import type { Page } from '@playwright/test'
+import sharp from 'sharp'
 
 import { expect, test } from './fixtures'
 import {
@@ -30,12 +31,7 @@ import {
 test.setTimeout(120_000)
 
 /**
- * Sample brightness from the WebGPU canvas via a 2D scratch canvas.
- *
- * Direct `canvas.getContext('2d').getImageData(...)` on the WebGPU canvas
- * itself can fail with CORS / context-mismatch errors; drawing the
- * canvas into a 2D scratch with `drawImage` preserves the composited
- * pixels and is the established pattern in this suite.
+ * Sample brightness from a compositor screenshot of the WebGPU canvas.
  *
  * @param page - Playwright page.
  * @returns `{ min, mean, max }` over a 32×32 downscaled sample, or
@@ -44,34 +40,48 @@ test.setTimeout(120_000)
 async function sampleCanvasBrightness(
   page: Page
 ): Promise<{ min: number; mean: number; max: number } | null> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector(
-      '[data-testid="webgpu-canvas"]'
-    ) as HTMLCanvasElement | null
-    if (!canvas) return null
-    if (!canvas.width || !canvas.height) return null
-    const scratch = document.createElement('canvas')
-    scratch.width = 32
-    scratch.height = 32
-    const ctx = scratch.getContext('2d')
-    if (!ctx) return null
-    try {
-      ctx.drawImage(canvas, 0, 0, 32, 32)
-    } catch {
-      return null
-    }
-    const img = ctx.getImageData(0, 0, 32, 32).data
-    let min = 255
-    let max = 0
-    let sum = 0
-    for (let i = 0; i < img.length; i += 4) {
-      const v = ((img[i] ?? 0) + (img[i + 1] ?? 0) + (img[i + 2] ?? 0)) / 3
-      if (v < min) min = v
-      if (v > max) max = v
-      sum += v
-    }
-    return { min, mean: sum / (img.length / 4), max }
-  })
+  // Compositor screenshot, not drawImage(): a WebGPU canvas's current texture
+  // expires once the frame is presented, so reading it from a later task via
+  // drawImage returned an all-black image (max 0) and the pixel checks failed
+  // regardless of what was rendered.
+  let png: Buffer
+  try {
+    png = await page.locator('[data-testid="webgpu-canvas"]').screenshot({ type: 'png' })
+  } catch {
+    return null
+  }
+  const { data, info } = await sharp(png)
+    .resize(32, 32, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  let min = 255
+  let max = 0
+  let sum = 0
+  const px = info.width * info.height
+  for (let i = 0; i < px; i++) {
+    const o = i * info.channels
+    const v = ((data[o] ?? 0) + (data[o + 1] ?? 0) + (data[o + 2] ?? 0)) / 3
+    if (v < min) min = v
+    if (v > max) max = v
+    sum += v
+  }
+  return { min, mean: sum / px, max }
+}
+
+/**
+ * Start the CHSH trial loop. The loop only runs while the panel's Run toggle
+ * is active (store `isRunning`, default off); these specs predate the toggle
+ * and waited for trials that never came.
+ */
+async function startTrialLoop(page: Page): Promise<void> {
+  const toggle = page.getByTestId('bell-run-toggle')
+  if (!(await toggle.isVisible())) {
+    await page.getByTestId('right-panel-tabs-tab-analysis').click()
+  }
+  await expect(toggle).toBeVisible({ timeout: 15_000 })
+  await toggle.click({ force: true })
+  await expect(toggle).toHaveText('Pause')
 }
 
 test('Bell experiment: panel mounts and converges past the classical bound', async ({ page }) => {
@@ -91,6 +101,7 @@ test('Bell experiment: panel mounts and converges past the classical bound', asy
   // v=1 + η=1 is the unconstrained CHSH cell — both thresholds allow violation.
   await expect(page.getByTestId('bell-werner-status')).toContainText('allows')
   await expect(page.getByTestId('bell-eta-status')).toContainText('allows')
+  await startTrialLoop(page)
 
   // The renderer strategy drives ~1000 trials/frame; the |S| estimate will
   // cross the classical bound within seconds and the badge will appear.
@@ -118,6 +129,7 @@ test('Bell experiment: Werner threshold forbids violation for v=0.5', async ({ p
   // v=0.5 is below the Werner threshold ≈ 0.7071 — the panel must report
   // "forbids" so the audience knows |S| cannot exceed 2 no matter the angles.
   await expect(page.getByTestId('bell-werner-status')).toContainText('forbids')
+  await startTrialLoop(page)
 
   // Wait for trials to accumulate. With v=0.5 the QM ceiling is 2√2 · 0.5 ≈
   // 1.41 — even at 100k trials |S| cannot reach 2. The bell-violated badge
@@ -146,6 +158,7 @@ test('Bell experiment: canvas renders the apparatus and frame counter advances',
   await waitForFirstFrame(page)
   // Confirm the renderer is in bellPair mode before sampling pixels.
   await expect(page.getByTestId('bell-experiment-content')).toBeVisible({ timeout: 15_000 })
+  await startTrialLoop(page)
   // Let the apparatus warm up — the shader's brightness ramps with trialCount,
   // and the volume raymarcher needs a few frames to stabilize.
   await waitForFrameAdvance(page, (await getFrameCount(page)) + 60)
@@ -191,6 +204,7 @@ test('Bell experiment: CHSH violation glow brightens the canvas vs sub-threshold
   await waitForAppLoaded(page)
   await waitForRendererReady(page)
   await waitForFirstFrame(page)
+  await startTrialLoop(page)
   // Let trials accumulate so the warmth ramp + (no) glow settles.
   await waitForFrameAdvance(page, (await getFrameCount(page)) + 120)
   const dim = await sampleCanvasBrightness(page)
@@ -203,6 +217,7 @@ test('Bell experiment: CHSH violation glow brightens the canvas vs sub-threshold
   await waitForAppLoaded(page)
   await waitForRendererReady(page)
   await waitForFirstFrame(page)
+  await startTrialLoop(page)
   await waitForFrameAdvance(page, (await getFrameCount(page)) + 120)
   const bright = await sampleCanvasBrightness(page)
   if (bright === null) {

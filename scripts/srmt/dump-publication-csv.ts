@@ -22,11 +22,11 @@ import { buildSrmtSweepManifest } from '../../src/lib/physics/srmt/sweepManifest
 import type { SrmtSweepConfig } from '../../src/lib/physics/srmt/sweepTypes'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
   WDW_SOLVER_VERSION,
 } from '../../src/lib/physics/wheelerDeWitt/solver'
 
-const wdw: WheelerDeWittSolverInput = {
+const wdw: WheelerDeWittSolverInput3D = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
   cosmologicalConstant: 0.1,

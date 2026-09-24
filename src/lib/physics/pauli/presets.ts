@@ -49,7 +49,11 @@ export const PAULI_SCENARIO_PRESETS: PauliScenarioPreset[] = [
   {
     id: 'spinFlip',
     name: 'Spin Flip (Rabi)',
-    description: 'Resonant rotating field driving spin transitions between ↑ and ↓',
+    // B = B₀(cos ωt, sin ωt, 0) has no static component: in the co-rotating
+    // frame the spin precesses about (B₀, 0, −ℏω/2), so ω = B₀ = 2 flips at
+    // most B₀²/(B₀² + (ℏω/2)²) = 80 % — detuned, not resonant.
+    description:
+      'Rotating transverse field driving Rabi oscillations between ↑ and ↓ (detuned: at most 80 % of the spin flips)',
     overrides: {
       fieldType: 'rotating',
       fieldStrength: 2.0,

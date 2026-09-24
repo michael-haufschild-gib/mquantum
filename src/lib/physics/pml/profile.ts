@@ -7,13 +7,17 @@
  * The PML uses cubic polynomial grading in the shader:
  *   σ(x) = σ_max · (d / L_pml)^p
  *
- * σ_max is calibrated so that the outermost grid point (ratio = 1) damps
- * to R_target per full substep:
- *   exp(-σ_max · dt) = R_target  →  σ_max = -ln(R_target) / dt
+ * Production passes (TDSE, Dirac, Pauli, FreeScalarField via
+ * {@link sigmaMaxFromPmlConfig}) use the round-trip traversal calibration
+ * {@link computePMLSigmaMaxND}:
+ *   σ_max = (p + 1) · (−ln R_target) / (2 · N_PML · dt)
+ * so the "Reflection" slider is the target round-trip reflection for a wave
+ * advancing ~one cell per step through a layer of N_PML points — σ_max
+ * scales inversely with the PML width.
  *
- * This decouples σ_max from the PML width. Width independently controls
- * how many grid points participate in absorption (smoothness of transition).
- * The "Reflection" slider controls per-step damping strength at the outer edge.
+ * {@link computePMLSigmaMax} is the older width-independent per-step
+ * calibration (outer edge damps to R_target per step:
+ * σ_max = −ln(R_target)/dt); it is kept for tests/reference only.
  *
  * References:
  *   - Antoine, Lorin (2019) — AP-PML for split-step FFT
@@ -69,6 +73,8 @@ export function computePMLSigmaMax(targetReflection: number, dt: number): number
  * @param dt - Simulation timestep
  * @param order - Polynomial grading order (default 3 = cubic)
  * @param latticeDim - Number of active spatial dimensions
+ * @param periodicDimsMask - Bit d set ⇒ axis d is periodic and carries no PML
+ *   (the shader's compactDimsMask); such axes must not set the weakest face
  * @returns σ_max in units of 1/time
  */
 export function computePMLSigmaMaxND(
@@ -77,7 +83,8 @@ export function computePMLSigmaMaxND(
   gridSizes: number[],
   dt: number,
   order: number = 3,
-  latticeDim?: number
+  latticeDim?: number,
+  periodicDimsMask: number = 0
 ): number {
   if (targetReflection <= 0 || targetReflection >= 1 || !Number.isFinite(targetReflection)) return 0
   if (dt <= 0 || !Number.isFinite(dt)) return 0
@@ -88,11 +95,15 @@ export function computePMLSigmaMaxND(
   if (!Number.isInteger(dims) || dims <= 0 || gridSizes.length === 0 || gridSizes.length < dims)
     return 0
 
-  // Use the minimum PML width across active dimensions (weakest face)
+  // Use the minimum PML width across the active dimensions that carry PML
+  // (weakest face). Periodic axes have no absorbing faces: letting a small
+  // compact axis (e.g. N = 8 → 1.6 PML points) set the minimum inflated σ_max
+  // on every real face by N_open / N_compact.
   let minPMLPoints = Infinity
   for (let d = 0; d < dims; d++) {
     const N = gridSizes[d]!
     if (!Number.isSafeInteger(N) || N <= 0) return 0
+    if ((periodicDimsMask & (1 << d)) !== 0) continue
     minPMLPoints = Math.min(minPMLPoints, pmlWidth * N)
   }
 
@@ -135,7 +146,8 @@ export interface PmlSigmaMaxConfig {
  */
 export function sigmaMaxFromPmlConfig(
   config: PmlSigmaMaxConfig,
-  absorberWidthOverride?: number
+  absorberWidthOverride?: number,
+  periodicDimsMask = 0
 ): number {
   if (!config.absorberEnabled) return 0
   const width = absorberWidthOverride ?? config.absorberWidth
@@ -145,6 +157,7 @@ export function sigmaMaxFromPmlConfig(
     config.gridSize,
     config.dt,
     PML_GRADING_EXPONENT,
-    config.latticeDim
+    config.latticeDim,
+    periodicDimsMask
   )
 }

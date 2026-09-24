@@ -36,11 +36,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { Page } from '@playwright/test'
+import sharp from 'sharp'
 
 import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -113,15 +115,20 @@ async function readDebugBuffer(page: Page): Promise<FsfCosmoDebugSample[]> {
   })
 }
 
+// Store access goes through the live DEV window bridge: after HMR, a raw
+// `await import('/src/stores/…')` can resolve to a detached module instance,
+// so the preset landed in a copy the app never reads and 0 debug samples were
+// recorded.
 async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__! }
     mod.useExtendedObjectStore.getState().applyFreeScalarPreset('deSitterVacuum')
   })
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__! }
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return (
         fs.initialCondition === 'vacuumNoise' &&
@@ -137,16 +144,17 @@ async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
   // showed `autoScale: false` despite the preset declaring true, so this
   // reproduces the user's exact setting.
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__! }
     mod.useExtendedObjectStore.getState().setFreeScalarAutoScale(true)
     // Also force a field reset so the new auto-scale baseline is recomputed
     // from eta0 and the vacuum is re-sampled cleanly.
     mod.useExtendedObjectStore.getState().resetFreeScalarField()
   })
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__! }
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return fs.autoScale === true
     },
@@ -156,7 +164,7 @@ async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
 
 async function readFsfConfigSnapshot(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__! }
     const s = mod.useExtendedObjectStore.getState()
     const fs = s.schroedinger.freeScalar
     return {
@@ -183,52 +191,34 @@ async function readFsfConfigSnapshot(page: Page) {
 }
 
 /**
- * Sample the canvas pixel brightness by reading a central 32x32 region. Fast
- * bucket: min / mean / max across RGB channels. Exposes "flash" events as
- * sudden spikes in the `meanBrightness` series. `ImageData.data` is a
- * `Uint8ClampedArray` so every byte is already a finite integer in [0, 255]
- * — no NaN guard is needed.
+ * Sample the canvas pixel brightness from a compositor screenshot (PNG),
+ * downscaled to 32×32. Fast bucket: min / mean / max across RGB channels.
+ * Exposes "flash" events as sudden spikes in the `meanBrightness` series.
+ * Reading the WebGPU canvas via drawImage() from a later task returned an
+ * all-black image (its current texture expires at presentation), so every
+ * logged brightness was 0 and no flash could ever register.
  */
 async function probeCanvasBrightness(
-  page: Page
+  png: Buffer | null
 ): Promise<{ min: number; mean: number; max: number } | null> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector(
-      '[data-testid="webgpu-canvas"]'
-    ) as HTMLCanvasElement | null
-    if (!canvas) return null
-    const w = canvas.width
-    const h = canvas.height
-    if (!w || !h) return null
-    // Use a 2D scratch canvas to read a downscaled copy of the WebGPU canvas.
-    // Direct readback from a WebGPU-rendered canvas via getImageData can fail
-    // (CORS / context mismatch); drawImage preserves pixels via the compositor.
-    const scratch = document.createElement('canvas')
-    scratch.width = 32
-    scratch.height = 32
-    const ctx = scratch.getContext('2d')
-    if (!ctx) return null
-    try {
-      ctx.drawImage(canvas, 0, 0, 32, 32)
-    } catch {
-      return null
-    }
-    const img = ctx.getImageData(0, 0, 32, 32).data
-    let min = 255
-    let max = 0
-    let sum = 0
-    for (let i = 0; i < img.length; i += 4) {
-      const r = img[i]!
-      const g = img[i + 1]!
-      const b = img[i + 2]!
-      const v = (r + g + b) / 3
-      if (v < min) min = v
-      if (v > max) max = v
-      sum += v
-    }
-    const mean = sum / (img.length / 4)
-    return { min, mean, max }
-  })
+  if (!png) return null
+  const { data, info } = await sharp(png)
+    .resize(32, 32, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  let min = 255
+  let max = 0
+  let sum = 0
+  const px = info.width * info.height
+  for (let i = 0; i < px; i++) {
+    const o = i * info.channels
+    const v = ((data[o] ?? 0) + (data[o + 1] ?? 0) + (data[o + 2] ?? 0)) / 3
+    if (v < min) min = v
+    if (v > max) max = v
+    sum += v
+  }
+  return { min, mean: sum / px, max }
 }
 
 interface BrightnessSample {
@@ -257,12 +247,13 @@ async function pollScreenshotAndBrightness(
     await page.waitForTimeout(pollIntervalMs)
     const elapsed = Math.round(Date.now() - startPoll)
     const path = join(shotDir, `t${String(elapsed).padStart(5, '0')}ms.png`)
+    let png: Buffer | null = null
     try {
-      await canvas.screenshot({ path })
+      png = await canvas.screenshot({ path })
     } catch {
       /* ignore canvas screenshot failures (rare, mid-reset) */
     }
-    const probe = await probeCanvasBrightness(page)
+    const probe = await probeCanvasBrightness(png)
     if (probe) {
       series.push({ t: elapsed, ...probe })
     }

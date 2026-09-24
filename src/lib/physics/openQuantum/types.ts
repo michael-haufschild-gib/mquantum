@@ -214,7 +214,7 @@ export interface OpenQuantumMetrics {
   vonNeumannEntropy: number
   /** Σ_{k≠l} |ρ_{kl}| — total off-diagonal magnitude */
   coherenceMagnitude: number
-  /** Re(ρ_{00}) — ground state population */
+  /** Re(ρ_{gg}) — population of the lowest-energy basis state g */
   groundPopulation: number
   /** Tr(ρ) — should be ≈1; deviation indicates numerical drift */
   trace: number

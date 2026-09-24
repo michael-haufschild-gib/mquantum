@@ -9,6 +9,8 @@ export default {
       true,
       { ignoreAtRules: ['theme', 'utility', 'layer', 'apply', 'tailwind', 'plugin', 'config'] },
     ],
+    // @apply takes Tailwind utility class names, not a CSS-grammar prelude.
+    'at-rule-prelude-no-invalid': [true, { ignoreAtRules: ['apply'] }],
     'function-no-unknown': [true, { ignoreFunctions: ['oklch', 'color-mix', 'theme'] }],
     'import-notation': 'string',
 

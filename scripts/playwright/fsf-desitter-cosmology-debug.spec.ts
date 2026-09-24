@@ -38,6 +38,7 @@ import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -121,7 +122,8 @@ async function applyDeSitterVacuumPreset(page: Page): Promise<void> {
   })
 
   // Wait for the preset overrides to land in the store.
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar

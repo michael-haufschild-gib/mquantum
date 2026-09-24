@@ -239,3 +239,44 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   // the transient mismatch on app startup.
   slicePositions: [],
 }
+
+/**
+ * Default phase-winding plane for BEC vortex `which` (1 or 2) on a
+ * `latticeDim`-axis lattice. Plane 1 is xy. Plane 2 is zw from 4D up
+ * (orthogonal 2-planes — brane reconnection), yz in 3D (xy ⟂ yz ⇒ two
+ * perpendicular vortex lines, the classic 3D reconnection geometry) and xy
+ * below 3D (the only plane).
+ *
+ * @param which - Vortex index (1 or 2)
+ * @param latticeDim - Active lattice dimension
+ * @returns The default axis pair
+ */
+export function defaultBecVortexPlane(which: 1 | 2, latticeDim: number): [number, number] {
+  if (latticeDim < 2) return [0, 0]
+  if (which === 1 || latticeDim < 3) return [0, 1]
+  return latticeDim >= 4 ? [2, 3] : [1, 2]
+}
+
+/**
+ * A BEC vortex winding plane valid for `latticeDim` axes: two distinct
+ * integer axes in [0, latticeDim). Anything else falls back to
+ * {@link defaultBecVortexPlane} instead of clamping — clamping the 4D default
+ * zw = [2, 3] on a 3D lattice gave [2, 2], which then collapsed onto plane 1
+ * and seeded two parallel lines instead of a reconnecting pair.
+ *
+ * @param plane - Stored axis pair
+ * @param which - Vortex index (1 or 2)
+ * @param latticeDim - Active lattice dimension
+ * @returns A valid axis pair
+ */
+export function normalizeBecVortexPlane(
+  plane: readonly number[] | undefined,
+  which: 1 | 2,
+  latticeDim: number
+): [number, number] {
+  const a = plane?.[0]
+  const b = plane?.[1]
+  const inRange = (v: number | undefined): v is number =>
+    Number.isInteger(v) && v! >= 0 && v! < latticeDim
+  return inRange(a) && inRange(b) && a !== b ? [a, b] : defaultBecVortexPlane(which, latticeDim)
+}

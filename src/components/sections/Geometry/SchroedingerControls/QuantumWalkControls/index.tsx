@@ -125,7 +125,7 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
           />
           <Slider
             label="Coin Bias"
-            tooltip="Bias angle θ for H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]]. 0.5 = standard Hadamard. Lower values bias leftward, higher rightward."
+            tooltip="Coin bias b sets the angle θ = b·π/2 of H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]]; b = 0.5 (θ = π/4) is the standard Hadamard. Lower values bias leftward, higher rightward."
             min={0.01}
             max={0.99}
             step={0.01}

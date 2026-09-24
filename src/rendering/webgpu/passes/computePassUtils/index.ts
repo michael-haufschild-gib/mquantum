@@ -259,6 +259,22 @@ export function assertSharedMemoryFFTLog2(axisDim: number, label = 'FFT'): numbe
 }
 
 /**
+ * Workgroup count for the multi-pencil shared-memory FFT kernel
+ * (`sharedMemFFTMultiPencilTwiddleBlock`), which packs max(1, 128/N) pencils
+ * per workgroup: ceil(totalSites / 128) for N ≤ 128. Every lattice within
+ * MAX_LINEAR_DISPATCH_SITES therefore stays under MAX_DISPATCH_PER_DIM,
+ * where one pencil per workgroup (totalSites / N) did not.
+ *
+ * @param totalSites - Lattice site count (FFT buffer elements)
+ * @param axisDim - Length of the transformed axis (power of two ≤ 128)
+ * @returns Workgroups to dispatch along x
+ */
+export function sharedMemFFTWorkgroupCount(totalSites: number, axisDim: number): number {
+  const pencilsPerWorkgroup = Math.max(1, Math.floor(SHARED_MEM_FFT_MAX_AXIS / axisDim))
+  return Math.ceil(totalSites / axisDim / pencilsPerWorkgroup)
+}
+
+/**
  * Reduce grid dimensions until total sites fit within the GPU dispatch limit.
  * Halves the largest axis repeatedly until the product is within bounds.
  *

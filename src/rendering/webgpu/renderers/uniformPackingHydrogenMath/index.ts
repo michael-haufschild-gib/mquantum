@@ -56,7 +56,16 @@ export function computeHydrogenRadialNormND(
 
 /**
  * Compute exp(lnHypersphericalLayerNorm(lk, lkp1, D, k)) on CPU.
- * Mirrors the WGSL lnHypersphericalLayerNorm exactly for shader-valid inputs.
+ * Mirrors the WGSL lnHypersphericalLayerNorm for shader-valid inputs.
+ *
+ * Layer k carries sin^{l_{k+1}}(θ) · C_n^α(cos θ) against the S^{D-1} weight
+ * sin^{D-k-2}(θ), so with n = l_k − l_{k+1} and α = l_{k+1} + (D−k−2)/2 the
+ * unit-norm constant follows from the Gegenbauer orthogonality integral
+ *   ∫₀^π [C_n^α(cos θ)]² sin^{2α}(θ) dθ = π 2^{1−2α} Γ(n+2α) / (n! (n+α) Γ(α)²):
+ *   N² = n! (n+α) Γ(α)² 2^{2α−1} / (π Γ(n+2α)).
+ * (The earlier closed form (2l_k+D−k−1)·n!·Γ(α+½)/(2Γ(n+α+3/2)) left each
+ * layer's integral anywhere in ≈[0.7, 1.7], so D ≥ 4 coupled states were
+ * not unit-normalized and their brightness varied with the angular chain.)
  */
 export function computeHypersphericalLayerNorm(
   lk: number,
@@ -81,24 +90,26 @@ export function computeHypersphericalLayerNorm(
   const nk = lk - lkp1
   if (nk < 0 || nk > MAX_WGSL_FACTORIAL_INDEX) return INVALID_HYPERSPHERICAL_NORM
 
-  const dMinusKMinus1 = D - k - 1
-  const prefactor = 2 * lk + dMinusKMinus1
-  const gammaArgNum = 2 * lkp1 + dMinusKMinus1
-  const gammaArgDen = 2 * lk + dMinusKMinus1 + 2
+  // 2α is an integer ≥ 2 for every emitted layer (k ≤ D−4), so Γ(α) is a
+  // half-integer LUT entry and Γ(n+2α) = (n+2α−1)!.
+  const twoAlpha = 2 * lkp1 + D - k - 2
+  const gammaFactIdx = nk + twoAlpha - 1
   if (
-    gammaArgNum < 1 ||
-    gammaArgNum > MAX_WGSL_GAMMA_HALF_INDEX ||
-    gammaArgDen < 1 ||
-    gammaArgDen > MAX_WGSL_GAMMA_HALF_INDEX
+    twoAlpha < 1 ||
+    twoAlpha > MAX_WGSL_GAMMA_HALF_INDEX ||
+    gammaFactIdx < 0 ||
+    gammaFactIdx > MAX_WGSL_FACTORIAL_INDEX
   ) {
     return INVALID_HYPERSPHERICAL_NORM
   }
 
-  const lnNkFact = lnFactorial(nk)
-  const lnGammaNum = lnGammaHalf(gammaArgNum)
-  const lnGammaDen = lnGammaHalf(gammaArgDen)
   const lnNormSq =
-    Math.log(Math.max(prefactor, 1e-20)) + lnNkFact + lnGammaNum - 0.6931472 - lnGammaDen
+    lnFactorial(nk) +
+    Math.log(0.5 * (2 * nk + twoAlpha)) +
+    2 * lnGammaHalf(twoAlpha) +
+    (twoAlpha - 1) * Math.LN2 -
+    Math.log(Math.PI) -
+    lnFactorial(gammaFactIdx)
   const norm = Math.exp(0.5 * lnNormSq)
   return Number.isFinite(norm) && norm >= 0 ? norm : INVALID_HYPERSPHERICAL_NORM
 }

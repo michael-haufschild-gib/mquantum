@@ -218,8 +218,8 @@ test.describe('performance benchmark', () => {
       // Uncap FPS limiter so frame times reflect actual GPU workload,
       // not the 60fps vsync ceiling. 0 = uncapped (transient, not persisted).
       // Also enable perf monitor so WebGPUStatsCollector publishes metrics.
-      // Uses window globals (works in both dev and production ?_bench builds)
-      // with dynamic import fallback for dev-only compatibility.
+      // Uses the DEV-only window-global store bridge (main.tsx) with a dynamic
+      // import fallback for the window before the bridge resolves.
       await page.evaluate(async () => {
         const perfStore =
           window.__PERFORMANCE_STORE__ ??

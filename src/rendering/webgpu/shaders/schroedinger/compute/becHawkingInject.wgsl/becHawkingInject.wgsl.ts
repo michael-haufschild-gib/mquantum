@@ -5,11 +5,19 @@
  * at the analog black-hole horizon, seeding the stochastic phonon bath that
  * produces analog Hawking radiation in the BEC (Unruh 1981; Lahav et al. 2010).
  *
- * Dispatch cadence: this kernel is dispatched **once per frame, after the
- * full Strang evolution for that frame completes** (see `runHawkingFrame` in
- * `TDSEComputePassHawking.ts`). It is NOT inserted between Strang substeps —
- * the pair-injection phase kick is a per-frame stochastic perturbation, and
- * `params.hawkingStepIndex` advances exactly once per frame.
+ * Dispatch cadence: this kernel is dispatched **at most once per frame, after
+ * the full Strang evolution for that frame completes** (see `runHawkingFrame`
+ * in `TDSEComputePassHawking.ts`), and only when that frame advanced at least
+ * one step. It is NOT inserted between Strang substeps; instead the kick is
+ * scaled by `kick.x = √(stepsTaken / stepsPerFrame)` so the injected phase
+ * variance per simulated step does not depend on the playback speed (a
+ * speed-1 frame keeps the unscaled `rate`). `params.hawkingStepIndex`
+ * advances once per dispatched kick.
+ *
+ * Race-free stencil: ψ is read from `psiPrev`, a pre-dispatch snapshot, and
+ * written to `psi`. Reading the neighbours from the live buffer let an
+ * invocation see a neighbour that another workgroup had already rotated, so
+ * the Mach estimate (and the horizon weight) depended on dispatch order.
  *
  * For each lattice site:
  *   1. Compute v_s = (ℏ/m) · Im(ψ*∇ψ)/|ψ|² via central differences.
@@ -17,7 +25,7 @@
  *   3. Gaussian horizon weight w(M) = exp(−((M−1)/0.25)²) concentrates the
  *      perturbation to voxels within one FWHM of M=1.
  *   4. Deterministic noise η ∈ (−1, 1) from splitmix32(siteIdx, seed, stepIdx).
- *   5. Rotate ψ by δφ = rate · w · η: ψ ← ψ · exp(i δφ).
+ *   5. Rotate ψ by δφ = rate · kick.x · w · η: ψ ← ψ · exp(i δφ).
  *
  * Identity at w=0 or rate=0 — never breaks norm catastrophically (small-angle
  * phase kick). Kept off by default (`hawkingPairInjection` flag) so the
@@ -32,6 +40,9 @@
 export const becHawkingInjectBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> psiPrev: array<vec2f>;
+// x = √(stepsTaken / stepsPerFrame) kick-amplitude scale; yzw unused.
+@group(0) @binding(3) var<uniform> kick: vec4f;
 
 fn splitmix32_inj(x: u32) -> u32 {
   var z: u32 = x + 0x9e3779b9u;
@@ -62,7 +73,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let activeDim = min(params.latticeDim, 12u);
   let coords = linearToND(idx, params.strides, params.gridSize, activeDim);
 
-  let zC = psi[idx];
+  let zC = psiPrev[idx];
   let re = zC.x;
   let im = zC.y;
   let density = re * re + im * im;
@@ -89,8 +100,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dxAbs = abs(params.spacing[d]);
     let safeDx = select(1e-6, dxAbs, dxAbs >= 1e-6);
     let invDx = 0.5 / safeDx;
-    let zF = psi[fwdIdx];
-    let zB = psi[bwdIdx];
+    let zF = psiPrev[fwdIdx];
+    let zB = psiPrev[bwdIdx];
     let dRe = (zF.x - zB.x) * invDx;
     let dIm = (zF.y - zB.y) * invDx;
     let jd = hbarOverM * (re * dIm - im * dRe);
@@ -109,7 +120,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let zWeight = (mach - 1.0) / 0.25;
   let w = exp(-zWeight * zWeight);
   let eta = hawkingNoise01(idx, params.hawkingSeed, params.hawkingStepIndex);
-  let dPhi = params.hawkingInjectRate * w * eta;
+  let dPhi = params.hawkingInjectRate * kick.x * w * eta;
   // Small-angle rotation of ψ by δφ. Avoids norm drift beyond O(dPhi²) rounding.
   let c = cos(dPhi);
   let s = sin(dPhi);

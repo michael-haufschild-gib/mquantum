@@ -7,7 +7,7 @@
  * @module rendering/webgpu/renderers/strategies/analyticOpenQuantum
  */
 
-import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
+import { buildLindbladChannels, lowestEnergyIndex } from '@/lib/physics/openQuantum/channels'
 import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import {
   basisEnergies,
@@ -77,6 +77,13 @@ export class AnalyticOpenQuantumExecutor {
   private hoPropagatorKey = ''
   private hoChannels: LindbladChannel[] = []
   private hoEnergies: Float64Array | null = null
+  /**
+   * Lowest-energy preset term. The HO basis keeps the preset's (random) term
+   * order so the GPU term indices stay valid, so the ground state for the
+   * relaxation/thermal channels and the ground-population metric is not
+   * index 0 in general.
+   */
+  private hoGroundIndex = 0
   private hoPropagator: ComplexMatrix | null = null
   private hoPopulationLabels: string[] | null = null
 
@@ -259,7 +266,8 @@ export class AnalyticOpenQuantumExecutor {
       return
     }
 
-    this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
+    // Hydrogen basis is energy-sorted: ground state at index 0.
+    this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance, 0)
     gridPass.updateHydrogenBasisUniforms(shared.device, this.hydrogenBasisPackedBuffer!)
   }
 
@@ -313,11 +321,12 @@ export class AnalyticOpenQuantumExecutor {
       !this.hoEnergies ||
       this.hoEnergies.length !== K
     ) {
-      this.hoChannels = buildLindbladChannels(oqConfig, K)
       const energies = new Float64Array(K)
       for (let k = 0; k < K; k++) {
         energies[k] = cachedPreset.energies[k] ?? 0
       }
+      this.hoGroundIndex = lowestEnergyIndex(energies)
+      this.hoChannels = buildLindbladChannels(oqConfig, K, this.hoGroundIndex)
       this.hoEnergies = energies
       const liouvillian = buildLiouvillian(energies, this.hoChannels, K)
       this.hoPropagator = computePropagator(liouvillian, dt * substeps, K)
@@ -359,7 +368,14 @@ export class AnalyticOpenQuantumExecutor {
       return
     }
 
-    this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
+    this.publishMetricsAndPack(
+      K,
+      gridPass,
+      shared,
+      schroedingerVersion,
+      performance,
+      this.hoGroundIndex
+    )
   }
 
   private publishMetricsAndPack(
@@ -367,11 +383,12 @@ export class AnalyticOpenQuantumExecutor {
     gridPass: DensityGridComputePass,
     shared: ModeFrameContext,
     schroedingerVersion: number,
-    performance: PerformanceSnapshot | undefined
+    performance: PerformanceSnapshot | undefined,
+    groundIndex: number
   ): void {
     this.frameCounter++
     const includeVonNeumann = this.frameCounter % 4 === 0
-    const metrics = computeMetrics(this.state!, includeVonNeumann, this.lastVonNeumann)
+    const metrics = computeMetrics(this.state!, includeVonNeumann, this.lastVonNeumann, groundIndex)
     if (includeVonNeumann) {
       this.lastVonNeumann = metrics.vonNeumannEntropy
     }
@@ -506,6 +523,7 @@ export class AnalyticOpenQuantumExecutor {
     this.hoPropagatorKey = ''
     this.hoChannels = []
     this.hoEnergies = null
+    this.hoGroundIndex = 0
     this.hoPropagator = null
     this.hydrogenBasis = null
     this.hydrogenRates = null

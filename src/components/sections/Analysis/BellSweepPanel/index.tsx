@@ -11,7 +11,7 @@
  * @module components/sections/Analysis/BellSweepPanel
  */
 
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { BellAtlasHeatmap } from '@/components/sections/Analysis/BellAtlasHeatmap'
@@ -20,6 +20,7 @@ import { Slider } from '@/components/ui/Slider'
 import { type AtlasSweepPlan, stepEtaVisibilitySweep } from '@/lib/physics/bell/atlasSweep'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Atlas-sweep sub-panel React component. Drives the (η, v) sweep and
@@ -134,6 +135,22 @@ export const BellSweepPanel: React.FC = React.memo(() => {
     if (runTokenRef.current) runTokenRef.current.alive = false
     setSweepStatus('idle')
   }, [setSweepStatus])
+
+  // The setTimeout chain outlives this component. When it unmounts because the
+  // scene left the Bell experiment, stop the sweep — otherwise up to
+  // trialsPerCell × etaSteps × visibilitySteps trials keep running on the main
+  // thread behind the new mode. (Closing the panel while still in Bell mode
+  // keeps the sweep going, as before.)
+  useEffect(
+    () => () => {
+      if (useGeometryStore.getState().objectType === 'bellPair') return
+      if (runTokenRef.current) runTokenRef.current.alive = false
+      if (useBellExperimentStore.getState().sweepStatus === 'running') {
+        useBellExperimentStore.getState().setSweepStatus('idle')
+      }
+    },
+    []
+  )
 
   // Heatmap dimensions come from the snapshot captured at sweep start —
   // editing the sweepConfig sliders afterwards must not relayout cells

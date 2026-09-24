@@ -498,7 +498,10 @@ export function clampUiStateToPhiExtent(s: SrmtSweepUiState, phiExtent: number):
   if (s.kind !== 'phiRef') {
     return phiRef === s.phiRef ? s : { ...s, phiRef }
   }
-  const sweepMin = clamp(s.sweepMin)
+  // Keep the 0.05 minimum span the sliders enforce: clamping sweepMin to
+  // +phiExtent alone collapsed sweepMax onto it (a zero-width sweep of N
+  // identical φref points).
+  const sweepMin = Math.min(clamp(s.sweepMin), phiExtent - 0.05)
   const sweepMax = Math.min(phiExtent, Math.max(sweepMin + 0.05, clamp(s.sweepMax)))
   if (phiRef === s.phiRef && sweepMin === s.sweepMin && sweepMax === s.sweepMax) return s
   return { ...s, phiRef, sweepMin, sweepMax }

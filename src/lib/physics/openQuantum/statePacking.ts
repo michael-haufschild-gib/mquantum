@@ -111,11 +111,30 @@ export function packForGPU(
   out[RHO_FLOATS + 7] = 0
 }
 
+/** Largest coherence |ρ_{kj}| (j ≠ k) in row k of a row-major K×K complex matrix. */
+function maxRowCoherence(el: Float64Array, K: number, k: number): number {
+  let maxSq = 0
+  for (let j = 0; j < K; j++) {
+    if (j === k) continue
+    const re = el[2 * (k * K + j)]!
+    const im = el[2 * (k * K + j) + 1]!
+    maxSq = Math.max(maxSq, re * re + im * im)
+  }
+  return Math.sqrt(maxSq)
+}
+
 /**
- * Compute effective basis size by trimming trailing states with negligible population.
+ * Compute effective basis size by trimming trailing states that carry neither
+ * population nor coherence.
  *
- * Scans diagonal elements ρ_{kk} and finds the last index with population above
- * the threshold. Returns lastActive + 1, clamped to [minK, K].
+ * A state k is active while ρ_{kk} or any |ρ_{kj}| exceeds the threshold.
+ * Returns lastActive + 1, clamped to [minK, K].
+ *
+ * Coherences are part of the test because |ρ_{jk}| can reach √(ρ_jj ρ_kk):
+ * at ρ_kk = 0.01 beside a populated state that is ≈ 0.1, an interference term
+ * worth up to ~20 % of the local density. A population-only test dropped it,
+ * and the fringes vanished abruptly the frame relaxation pushed ρ_kk under the
+ * threshold.
  *
  * This trims trailing (high-energy) states that are effectively unpopulated,
  * reducing the GPU's O(K²) contraction loop without reordering the density matrix.
@@ -136,10 +155,10 @@ export function computeActiveK(rho: DensityMatrix, populationThreshold = 0.01, m
   const threshold = Number.isFinite(populationThreshold) ? populationThreshold : 0.01
   const minActiveK = Number.isFinite(minK) ? Math.max(2, Math.floor(minK)) : 2
 
-  // Find the last index with significant population
+  // Find the last index with significant population or coherence
   let lastActive = 0
   for (let k = 0; k < K; k++) {
-    if (el[2 * (k * K + k)]! > threshold) {
+    if (el[2 * (k * K + k)]! > threshold || maxRowCoherence(el, K, k) > threshold) {
       lastActive = k
     }
   }

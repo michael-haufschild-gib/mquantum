@@ -26,13 +26,15 @@ import {
   isBecInitialCondition,
 } from './becSetterDomain'
 import {
-  clampDtWithCfl,
+  clampSchrodingerLatticeDt,
   clampUint32Seed,
   computeCflLimit,
   defaultTdseGridPerDim,
   nestedClampedSetter,
   nestedIntSetter,
   type SetterContext,
+  sharedPmlClampedSetter,
+  sharedPmlEnabledSetter,
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
 
@@ -313,11 +315,11 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
     setBecAutoScale: (autoScale) => {
       setBooleanField('autoScale', autoScale)
     },
-    setBecAbsorberEnabled: (enabled) => {
-      setBooleanField('absorberEnabled', enabled)
-    },
-    setBecAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
-    setBecPmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
+    // PML is resolved through applySharedPml (shared value wins), so these
+    // write the shared schroedinger.* field as well as the nested copy.
+    setBecAbsorberEnabled: sharedPmlEnabledSetter(ctx, D),
+    setBecAbsorberWidth: sharedPmlClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setBecPmlTargetReflection: sharedPmlClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
     setBecDiagnosticsEnabled: (enabled) => {
       setBooleanField('diagnosticsEnabled', enabled)
     },
@@ -367,7 +369,7 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
           bec.compactRadii,
           bec.latticeDim,
           clamped,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -403,7 +405,7 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
           bec.compactRadii,
           latticeDim,
           bec.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -432,7 +434,7 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
           bec.compactRadii,
           bec.latticeDim,
           bec.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -480,7 +482,7 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
           bec.compactRadii,
           bec.latticeDim,
           bec.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -515,7 +517,7 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
           rawRadii,
           bec.latticeDim,
           bec.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {

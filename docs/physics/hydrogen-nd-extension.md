@@ -134,17 +134,19 @@ at most ~6 × 10⁻⁶ relative error to the final normalization — well within
 The LUTs must not be accessed out of bounds. The maximum indices are derived from
 UI parameter limits: n ≤ 7, l ≤ 6, D ≤ 11.
 
-**LN_GAMMA_HALF** (accessed in `lnHypersphericalLayerNorm`):
+**LN_GAMMA_HALF** (accessed in `lnHypersphericalLayerNorm` for Γ(α)):
 
-    gammaArgDen = 2·lk + (D - k - 1) + 2
+    twoAlpha = 2α = 2·lkp1 + (D - k - 2)
 
-    Worst case: k = 0, lk = l₁ = 6, D = 11
-    → 2×6 + 11 - 0 - 1 + 2 = 24 ≤ 30 ✓
+    Worst case: k = 0, lkp1 = l₂ = 6, D = 11
+    → 2×6 + 11 - 0 - 2 = 21 ≤ 30 ✓
 
-    gammaArgNum = 2·lkp1 + (D - k - 1)
+**LN_FACTORIAL_LUT** (accessed in `lnHypersphericalLayerNorm` for Γ(n+2α) = (n+2α−1)!):
 
-    Worst case: k = 0, lkp1 = l₂ = 5, D = 11
-    → 2×5 + 11 - 0 - 1 = 20 ≤ 30 ✓
+    gammaFactIdx = nk + twoAlpha - 1 = lk + lkp1 + D - k - 3
+
+    Worst case: k = 0, lk = lkp1 = 6, D = 11
+    → 6 + 6 + 11 - 0 - 3 = 20 ≤ 22 ✓
 
 **LN_FACTORIAL_LUT** (accessed in `hydrogenRadialNormND`):
 
@@ -176,24 +178,34 @@ per recurrence step is O(ε). For 6 steps:
 
 ### 2.4 Log-Space Normalization
 
-`lnHypersphericalLayerNorm` computes:
+`lnHypersphericalLayerNorm` (and its CPU mirror `computeHypersphericalLayerNorm`,
+whose value is what the shader actually reads) computes the inverse of the
+Gegenbauer orthogonality integral ∫₀^π [C_n^α(cos θ)]² sin^{2α}θ dθ, with
+n = l_k − l_{k+1} and α = l_{k+1} + (D − k − 2)/2:
 
-    lnNormSq = log(prefactor) + lnNkFact + lnGammaNum - 0.6931472 - lnGammaDen
+    N_k² = n! (n+α) Γ(α)² 2^{2α−1} / (π Γ(n+2α))
+    lnNormSq = ln n! + ln(n+α) + 2 lnΓ(α) + (2α−1)·ln 2 − ln π − ln (n+2α−1)!
 
-Five f32 additions. Each introduces ≤ ε rounding. Combined absolute error in
+Each layer therefore integrates to exactly 1 against its S^{D−1} weight
+sin^{D−k−2}θ (regression-tested by quadrature in
+`uniformPackingHydrogenMath.test.ts`). An earlier closed form,
+(2l_k+D−k−1)·n!·Γ(α+½)/(2Γ(n+α+3/2)), left the per-layer integral anywhere in
+≈[0.7, 1.7], so D ≥ 4 coupled states were not unit-normalized on the sphere.
+
+Six f32 additions. Each introduces ≤ ε rounding. Combined absolute error in
 ln-domain:
 
-    δ_ln ≤ 5 × ε × max(|term|) ≈ 5 × 1.19×10⁻⁷ × 25.19 ≈ 1.5 × 10⁻⁵
+    δ_ln ≤ 6 × ε × max(|term|) ≈ 6 × 1.19×10⁻⁷ × 42.34 ≈ 3.0 × 10⁻⁵
 
 The subsequent `exp(0.5 × lnNormSq)` amplifies this to relative error ≈ δ_ln in
-the normalization constant, i.e., ≤ 1.5 × 10⁻⁵.
+the normalization constant, i.e., ≤ 3.0 × 10⁻⁵ (largest term: ln 20! ≈ 42.34).
 
 ### 2.5 Full Product Chain
 
 For D = 11, the hyperspherical harmonic evaluates D - 3 = 8 Gegenbauer layers.
 Each layer contributes:
 
-- Normalization: ≤ 1.5 × 10⁻⁵ relative error
+- Normalization: ≤ 3.0 × 10⁻⁵ relative error
 - Gegenbauer value: ≤ 7.2 × 10⁻⁷ relative error
 - sin^{l_{k+1}} power: ≤ l_{max} × ε ≈ 7.2 × 10⁻⁷ relative error
 - Multiplication: ε per multiply
@@ -202,7 +214,7 @@ Per-layer relative error: ≤ 1.7 × 10⁻⁵.
 
 Over 8 layers (multiplicative accumulation):
 
-    Total relative error ≤ 8 × 1.7 × 10⁻⁵ ≈ 1.4 × 10⁻⁴
+    Total relative error ≤ 8 × 3.2 × 10⁻⁵ ≈ 2.6 × 10⁻⁴
 
 ### 2.6 Error Budget Assessment
 
@@ -210,15 +222,15 @@ Over 8 layers (multiplicative accumulation):
 |-|-|-|
 | LUT lookup (single) | ≤ 6 × 10⁻⁶ | f32 truncation of f64 values |
 | Gegenbauer recurrence | ≤ 7.2 × 10⁻⁷ | 6 steps max, backward-stable |
-| Log-space normalization | ≤ 1.5 × 10⁻⁵ | 5-term sum |
-| Full angular product (D=11) | ≤ 1.4 × 10⁻⁴ | 8 layers worst case |
+| Log-space normalization | ≤ 3.0 × 10⁻⁵ | 6-term sum |
+| Full angular product (D=11) | ≤ 2.6 × 10⁻⁴ | 8 layers worst case |
 | Radial wavefunction | ≤ 2 × 10⁻⁵ | Laguerre recurrence + norm |
-| **Total wavefunction** | **≤ 2 × 10⁻⁴** | Angular × radial |
+| **Total wavefunction** | **≤ 3 × 10⁻⁴** | Angular × radial |
 
 **Visualization precision requirement**: 8-bit color channels provide ~0.4%
-(4 × 10⁻³) precision. The worst-case numerical error (2 × 10⁻⁴) is **~20× below**
+(4 × 10⁻³) precision. The worst-case numerical error (3 × 10⁻⁴) is **~13× below**
 the visualization precision floor. For 10-bit HDR (~0.1% precision), the error is
-still ~5× below the threshold.
+still ~3× below the threshold.
 
 **Conclusion**: f32 precision is sufficient for all parameter combinations within
 UI limits (n ≤ 7, l ≤ 6, D ≤ 11). No double-precision fallback or extended LUTs

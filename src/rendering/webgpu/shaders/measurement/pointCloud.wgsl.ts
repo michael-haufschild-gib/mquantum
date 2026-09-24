@@ -14,7 +14,7 @@ struct Uniforms {
   pointSize: f32,
   opacity: f32,
   pointCount: u32,
-  _pad: u32,
+  aspect: f32,   // render-target width / height
 }
 
 struct VertexOutput {
@@ -52,8 +52,10 @@ fn main(@builtin(vertex_index) vid: u32) -> VertexOutput {
   // Project world position
   let clipPos = uni.viewProjection * vec4f(worldPos, 1.0);
 
-  // Billboard offset in clip space
-  let offset = QUAD_UVS[vertIdx] * uni.pointSize;
+  // Billboard offset in clip space. NDC x spans the target width and y its
+  // height, so divide the x offset by the aspect ratio to keep dots round
+  // on non-square canvases.
+  let offset = QUAD_UVS[vertIdx] * uni.pointSize * vec2f(1.0 / max(uni.aspect, 1e-4), 1.0);
   out.position = vec4f(clipPos.xy + offset * clipPos.w * 0.01, clipPos.z, clipPos.w);
   out.uv = QUAD_UVS[vertIdx];
   out.age = age;
@@ -73,7 +75,7 @@ struct Uniforms {
   pointSize: f32,
   opacity: f32,
   pointCount: u32,
-  _pad: u32,
+  aspect: f32,   // render-target width / height
 }
 
 @group(0) @binding(0) var<uniform> uni: Uniforms;

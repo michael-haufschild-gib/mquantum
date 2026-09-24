@@ -50,6 +50,15 @@ export const MsgBox: React.FC = () => {
     action.onClick()
   }
 
+  // Escape, backdrop and the header close button acknowledge the dialog too;
+  // routing them straight to closeMsgBox dropped a checked "Don't show again".
+  const handleClose = () => {
+    if (dontShowAgain && dismissId) {
+      dismiss(dismissId)
+    }
+    closeMsgBox()
+  }
+
   const getIcon = (): IconName => {
     switch (type) {
       case 'error':
@@ -93,7 +102,7 @@ export const MsgBox: React.FC = () => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeMsgBox} title={title} width="max-w-md">
+    <Modal isOpen={isOpen} onClose={handleClose} title={title} width="max-w-md">
       <div className="space-y-6">
         <div className={`flex items-start gap-4 p-4 rounded-xl border ${getBgClass()}`}>
           <div className={`shrink-0 p-2 rounded-full bg-[var(--bg-hover)] ${getColorClass()}`}>
@@ -116,7 +125,7 @@ export const MsgBox: React.FC = () => {
               checked={dontShowAgain}
               onCheckedChange={setDontShowAgain}
               label="Don't show again"
-              tooltip="Suppress this dialog for the rest of the session"
+              tooltip="Stop showing this dialog in this browser (restore dismissed dialogs from Settings)"
               className="text-sm"
               data-testid="msgbox-dismiss-switch"
             />

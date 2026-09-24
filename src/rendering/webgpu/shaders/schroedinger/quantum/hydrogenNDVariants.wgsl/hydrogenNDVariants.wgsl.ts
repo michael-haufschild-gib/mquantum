@@ -15,8 +15,13 @@
 import { sanitizeShaderDimension } from '../../../shared/compose-helpers'
 
 /**
- * Early-exit threshold for extra dimensions.
- * Uses 3-sigma threshold: sum of squared scaled coords > 18 means contribution < 1e-8
+ * Early-exit threshold for extra dimensions, in scaled units u = √ω·x.
+ * For all-ground-state extra dims, Σu² > 18 leaves |ψ|² < 2e-8 of peak.
+ * Excited states reach further (classical turning point u² = 2n+1), so the
+ * generated check widens the cut by 2·Σn_j: a flat 18 clipped an n = 6 extra
+ * dim at 3% of its peak density — a hard shell once N-D rotation mixes the
+ * extra axes into view. With the shift the worst clipped density (n = 6) is
+ * ≈ 6.5e-6 of peak, and ground states keep the original bound bit-for-bit.
  */
 const EXTRA_DIM_THRESHOLD = 18.0
 
@@ -55,13 +60,19 @@ function generateExtraDimEarlyExit(dimension: number): string {
   const distSqTerms = Array.from({ length: extraDimCount }, (_, i) => `u_ed${i}*u_ed${i}`).join(
     ' + '
   )
+  const nSumTerms = Array.from(
+    { length: extraDimCount },
+    (_, i) => `getExtraDimN(uniforms, ${i})`
+  ).join(' + ')
 
   return `
-  // EARLY EXIT 1: Check extra dimensions (unrolled, no loops)
+  // EARLY EXIT 1: Check extra dimensions (unrolled, no loops). The cut widens
+  // by 2·Σn so excited extra-dim states are not clipped inside their lobes.
 ${alphaDecls}
 ${uCalcs}
   let extraDistSq = ${distSqTerms};
-  if (extraDistSq > ${EXTRA_DIM_THRESHOLD.toFixed(1)}) {
+  let extraNSum = f32(${nSumTerms});
+  if (extraDistSq > ${EXTRA_DIM_THRESHOLD.toFixed(1)} + 2.0 * extraNSum) {
     return vec2f(0.0, 0.0);
   }
 `

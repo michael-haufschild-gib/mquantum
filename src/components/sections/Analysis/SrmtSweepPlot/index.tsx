@@ -28,7 +28,7 @@ const PLOT_H = CHART_H - PAD.top - PAD.bottom
 const CLOCK_COLORS: Record<SrmtClock, string> = {
   a: 'var(--srmt-chart-k)',
   phi1: 'var(--srmt-chart-hj)',
-  phi2: 'var(--accent)',
+  phi2: 'var(--color-accent)',
 }
 
 /** Props for the sweep plot. */

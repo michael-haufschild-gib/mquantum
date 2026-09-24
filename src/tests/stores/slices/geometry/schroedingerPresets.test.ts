@@ -114,6 +114,18 @@ describe('Schroedinger Store Presets', () => {
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
   })
 
+  it('keeps sampleCount in sync with a preset raymarchQuality override', () => {
+    // Regression: visualOverrides set raymarchQuality: 'quality' but left
+    // sampleCount (what the renderer reads) at its previous value.
+    useExtendedObjectStore.getState().setSchroedingerRaymarchQuality('fast')
+    expect(useExtendedObjectStore.getState().schroedinger.sampleCount).toBe(16)
+
+    useExtendedObjectStore.getState().setSchroedingerPresetName('fockLanternCathedral')
+    const config = useExtendedObjectStore.getState().schroedinger
+    expect(config.raymarchQuality).toBe('quality')
+    expect(config.sampleCount).toBe(48)
+  })
+
   it('resets Fock Lantern renderer gate when switching to a different named HO preset', () => {
     useExtendedObjectStore.getState().setSchroedingerPresetName('fockLanternCathedral')
     expect(useExtendedObjectStore.getState().schroedinger.fockLanternEnabled).toBe(true)

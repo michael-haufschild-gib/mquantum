@@ -77,7 +77,8 @@ export function createObservablesBuffers(
   const safeTotalSites = sanitizeObservablesTotalSites(totalSites)
   const posNumChannels = 2 + 2 * safeLatticeDim
   const momNumChannels = 1 + 2 * safeLatticeDim
-  const wgCount = Math.max(1, Math.ceil(safeTotalSites / 256))
+  // Must match WG_SIZE / @workgroup_size(128) in the observables reduce shaders.
+  const wgCount = Math.max(1, Math.ceil(safeTotalSites / 128))
 
   const uniformSize = 16 + 12 * 4 * 3 // ObsReduceUniforms: 4 scalars + 3 arrays of 12
   const posPartialSize = wgCount * posNumChannels * 4

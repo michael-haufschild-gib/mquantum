@@ -48,6 +48,8 @@ export interface SrmtQualityChipProps {
   value: number
   testId: string
   tooltipWhenPending?: string
+  /** Text shown for a non-finite value (default `pending`). */
+  pendingLabel?: string
 }
 
 /**
@@ -59,10 +61,11 @@ export const SrmtQualityChip: React.FC<SrmtQualityChipProps> = ({
   value,
   testId,
   tooltipWhenPending,
+  pendingLabel = 'pending',
 }) => {
   const tier = qualityTier(value)
   const style = TIER_STYLES[tier]
-  const text = tier === 'pending' ? 'pending' : value.toFixed(3)
+  const text = tier === 'pending' ? pendingLabel : value.toFixed(3)
   const chip = (
     <span
       className="inline-flex items-center rounded-md border px-2 py-0.5 text-2xs font-mono tabular-nums"

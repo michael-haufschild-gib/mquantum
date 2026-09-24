@@ -7,7 +7,7 @@
  * The target budget is ≤ 20 ms at the default grid so interactive
  * parameter sweeps stay at 60 fps.
  *
- * Run: pnpm exec vitest bench src/tests/lib/physics/wheelerDeWitt/solver.bench.ts
+ * Run: pnpm exec vitest bench --run src/tests/lib/physics/wheelerDeWitt/solver.bench
  *
  * Adjust the `bench.options` if / when algorithmic changes shift the
  * baseline; regressions will show as `.bench.ts` runs that exceed the
@@ -18,6 +18,7 @@
 
 import { bench, describe } from 'vitest'
 
+import { DEFAULT_WHEELER_DEWITT_CONFIG as D } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
   applyWdwPulseAlpha,
   applyWdwPulseAlphaRows,
@@ -36,22 +37,28 @@ import {
   integrateWkbTrajectories,
 } from '@/lib/physics/wheelerDeWitt/wkbStreamlines'
 
-/** Default Wheeler–DeWitt config — mirrors `DEFAULT_WHEELER_DEWITT_CONFIG`. */
+/**
+ * Store-default Wheeler–DeWitt input, derived from
+ * `DEFAULT_WHEELER_DEWITT_CONFIG` so the "default grid" numbers cannot drift
+ * from what users actually solve (the hand-copied literal had gone stale:
+ * Nphi 32 / phiExtent 2 vs the shipped 40 / 3.5).
+ */
 const DEFAULT_INPUT: WheelerDeWittSolverInput3D = {
-  boundaryCondition: 'noBoundary',
-  inflatonMass: 0.3,
-  cosmologicalConstant: 0.0,
-  aMin: 0.1,
-  aMax: 1.5,
-  gridNa: 128,
-  gridNphi: 32,
-  phiExtent: 2.0,
+  boundaryCondition: D.boundaryCondition,
+  inflatonMass: D.inflatonMass,
+  cosmologicalConstant: D.cosmologicalConstant,
+  aMin: D.aMin,
+  aMax: D.aMax,
+  gridNa: D.gridNa,
+  gridNphi: D.gridNphi,
+  phiExtent: D.phiExtent,
 }
+const DEFAULT_GRID_LABEL = `Na=${D.gridNa}, Nphi=${D.gridNphi}`
 
 const LOW_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 64, gridNphi: 16 }
-const HIGH_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 192, gridNphi: 32 }
+const HIGH_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 192 }
 
-describe('Wheeler–DeWitt solver — default grid (Na=128, Nphi=32)', () => {
+describe(`Wheeler–DeWitt solver — default grid (${DEFAULT_GRID_LABEL})`, () => {
   bench(
     'Hartle–Hawking BC',
     () => {
@@ -87,7 +94,7 @@ describe('Wheeler–DeWitt solver — grid-size scaling', () => {
   )
 
   bench(
-    'Default grid (Na=128, Nphi=32)',
+    `Default grid (${DEFAULT_GRID_LABEL})`,
     () => {
       solveWheelerDeWitt(DEFAULT_INPUT)
     },
@@ -95,7 +102,7 @@ describe('Wheeler–DeWitt solver — grid-size scaling', () => {
   )
 
   bench(
-    'High grid (Na=192, Nphi=32)',
+    `High grid (Na=192, Nphi=${D.gridNphi})`,
     () => {
       solveWheelerDeWitt(HIGH_GRID_INPUT)
     },

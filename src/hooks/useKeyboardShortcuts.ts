@@ -7,13 +7,33 @@ import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { getQuantumTypeEntry, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useExportStore } from '@/stores/runtime/exportStore'
 import { useCameraStore } from '@/stores/scene/cameraStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 import { useLightingStore } from '@/stores/scene/lightingStore'
 import { useLayoutStore } from '@/stores/ui/layoutStore'
+
+/**
+ * Dimension range of the active quantum type — the same bounds the Dimension
+ * selector enables. The arrow shortcuts must stay inside it: stepping a Bell
+ * pair (3D only) or a 6D Pauli spinor past its maximum made setDimension fall
+ * back to the Schrödinger object type, so one stray keypress abandoned the
+ * experiment.
+ */
+function activeDimensionRange(): { min: number; max: number } {
+  const { objectType } = useGeometryStore.getState()
+  const quantumMode = useExtendedObjectStore.getState().schroedinger?.quantumMode
+  const key = resolveQuantumTypeKey(objectType, quantumMode)
+  const entry = key ? getQuantumTypeEntry(key) : undefined
+  return {
+    min: Math.max(MIN_DIMENSION, entry?.dimensions.min ?? MIN_DIMENSION),
+    max: Math.min(MAX_DIMENSION, entry?.dimensions.max ?? MAX_DIMENSION),
+  }
+}
 
 /** Configuration for a single keyboard shortcut binding. */
 export interface ShortcutConfig {
@@ -208,10 +228,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         ...(!shiftKey && !selectedLightId && { r: resetCamera }),
         '?': toggleShortcuts,
         ArrowUp: () => {
-          if (dimension < MAX_DIMENSION) setDimension(dimension + 1)
+          if (dimension < activeDimensionRange().max) setDimension(dimension + 1)
         },
         ArrowDown: () => {
-          if (dimension > MIN_DIMENSION) setDimension(dimension - 1)
+          if (dimension > activeDimensionRange().min) setDimension(dimension - 1)
         },
       }
 

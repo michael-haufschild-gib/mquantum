@@ -148,7 +148,7 @@ Full verification table: [`validation-methodology.md`](validation-methodology.md
 | Zitterbewegung | `zitterbewegung` | Positive/negative energy interference |
 | Barrier tunneling | `diracBarrierTunneling` | Relativistic tunneling transmission |
 | Relativistic hydrogen | `relativisticHydrogen` | Coulomb potential, fine structure |
-| Dirac oscillator | `diracOscillator` | Harmonic trap: E_n = mc²√(1 + 2nℏω/mc²) |
+| Harmonic trap ("Dirac oscillator" preset) | `diracOscillator` | Electrostatic V = ½mω²r²·𝟙. A confining vector potential has no normalizable Dirac bound states (Klein tunneling once V − E > 2mc²), so levels are quasi-bound resonances. This is *not* the Moshinsky Dirac oscillator (non-minimal p → p − imωβr coupling, E_n = mc²√(1 + 2nℏω/mc²)), which is not implemented. |
 | Spin precession | `spinPrecession` | Inhomogeneous potential spin dynamics |
 
 **Code**: `dirac/presets.ts:24–123`.

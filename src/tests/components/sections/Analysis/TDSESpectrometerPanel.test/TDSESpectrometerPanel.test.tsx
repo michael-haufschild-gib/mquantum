@@ -219,11 +219,13 @@ describe('TDSESpectrometerPanel', () => {
       )
     })
 
-    it('omits the overlay for anisotropic harmonic traps (the ladder is not degenerate)', () => {
+    it('omits the overlay for anisotropic becTrap traps (the ladder is not degenerate)', () => {
+      // Only becTrap scales ω per axis — the plain harmonicTrap ignores
+      // trapAnisotropy in tdsePotential, so it is the anisotropic case.
       render(
         <TDSESpectrometerPanel
           tdse={cfg({
-            potentialType: 'harmonicTrap',
+            potentialType: 'becTrap',
             harmonicOmega: 1.0,
             latticeDim: 3,
             // 1.0 / 2.0 / 3.0 → no degenerate ladder → no overlay.

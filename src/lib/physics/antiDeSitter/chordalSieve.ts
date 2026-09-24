@@ -1,4 +1,8 @@
 const CHORDAL_SIEVE_EPSILON = 1e-6
+/** Floor on 1 − r² in the Busemann numerator — matches the shader's max(1 − r², 1e-6). */
+const BUSEMANN_NUMERATOR_FLOOR = 1e-6
+/** Density gate rate: the shader gates with 1 − exp(−10·|ψ|²). */
+const DENSITY_GATE_RATE = 10
 const TWO_PI_OVER_THREE = (2 * Math.PI) / 3
 
 /**
@@ -54,7 +58,7 @@ export function busemannClock(point: ChordalSievePoint, anchor: ChordalSievePoin
   const dy = point.y - anchor.y
   const dz = point.z - anchor.z
   const distanceSquared = dx * dx + dy * dy + dz * dz
-  const numerator = Math.max(1 - radiusSquared, Number.MIN_VALUE)
+  const numerator = Math.max(1 - radiusSquared, BUSEMANN_NUMERATOR_FLOOR)
   const denominator = distanceSquared + CHORDAL_SIEVE_EPSILON
   const clock = Math.log(numerator / denominator)
 
@@ -64,12 +68,18 @@ export function busemannClock(point: ChordalSievePoint, anchor: ChordalSievePoin
 /**
  * Computes the Round 8 AdS Chordal Sieve scalar used by the renderer.
  *
- * @param args Bulk point, density, and quantum controls.
+ * CPU mirror of the chordal-sieve branch in `antiDeSitter.wgsl` — keep the two
+ * term-for-term identical. The density gate is the shader's
+ * `1 − exp(−10·|ψ|²)` on the raw bulk density (this mirror previously
+ * multiplied by a normalized density instead, so its tests exercised a
+ * different transfer function than the one that renders).
+ *
+ * @param args Bulk point, raw bulk density |ψ|², and quantum controls.
  * @returns Bounded scalar density in [0, 1].
  */
 export function computeAdsChordalSieveScalar(args: {
   point: ChordalSievePoint
-  densityNorm: number
+  density: number
   n: number
   l: number
   m: number
@@ -82,8 +92,9 @@ export function computeAdsChordalSieveScalar(args: {
   const radiusSquared = squaredNorm(point)
   if (radiusSquared >= 1) return 0
 
-  const rhoNorm = clamp01(finiteOr(args.densityNorm, 0))
-  if (rhoNorm <= 0) return 0
+  const density = Math.max(finiteOr(args.density, 0), 0)
+  if (density <= 0) return 0
+  const densityGate = 1 - Math.exp(-DENSITY_GATE_RATE * density)
 
   const m = finiteOr(args.m, 0)
   const anchorA = boundaryAnchorForAds(m)
@@ -105,7 +116,7 @@ export function computeAdsChordalSieveScalar(args: {
   const oscillation = Math.abs(Math.sin(phase))
   const lattice = (0.35 + 0.65 * oscillation) ** 2
   const separation = 1 - Math.exp(-Math.abs(clockDiff))
-  const scalar = rhoNorm * lattice * separation
+  const scalar = densityGate * separation * lattice
 
   return clamp01(Number.isFinite(scalar) ? scalar : 0)
 }

@@ -35,6 +35,7 @@ import {
   nestedIntSetter,
   nestedValueSetter,
   type SetterContext,
+  sharedPmlClampedSetter,
 } from './sliceSetterUtils'
 
 /** Actions exposed by the Dirac equation setter bundle. */
@@ -328,7 +329,13 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         },
       }))
     },
-    setDiracPmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
+    setDiracPmlTargetReflection: sharedPmlClampedSetter(
+      ctx,
+      D,
+      'pmlTargetReflection',
+      1e-12,
+      0.999
+    ),
     setDiracGridSize: (size) => {
       if (!hasOnlyFinite(size)) {
         warnNonFinite('dirac.gridSize', size)

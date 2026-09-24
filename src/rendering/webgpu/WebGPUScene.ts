@@ -224,28 +224,28 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   useEffect(() => {
     const capture = new WebGPUCanvasCapture(device.getDevice())
 
-    graph.registerBeforeSubmitHook(
-      'screenshot-capture',
-      ({ encoder, canvasTexture, size: frameSize }) => {
-        const state = useScreenshotCaptureStore.getState()
-        if (state.status !== 'capturing') return
+    graph.registerBeforeSubmitHook('screenshot-capture', ({ encoder, canvasTexture }) => {
+      const state = useScreenshotCaptureStore.getState()
+      if (state.status !== 'capturing') return
 
-        capture.queueCapture({
-          encoder,
-          texture: canvasTexture,
-          width: frameSize.width,
-          height: frameSize.height,
-          format: device.getFormat(),
-          requestId: state.requestId,
-          onSuccess: (dataUrl, requestId) => {
-            useScreenshotCaptureStore.getState().setCapturedImage(dataUrl, requestId)
-          },
-          onError: (error, requestId) => {
-            useScreenshotCaptureStore.getState().setError(error, requestId)
-          },
-        })
-      }
-    )
+      // Copy extent from the texture itself: the graph size can lag the
+      // canvas texture around a resize, and an out-of-bounds copy would
+      // invalidate the whole frame's command buffer.
+      capture.queueCapture({
+        encoder,
+        texture: canvasTexture,
+        width: canvasTexture.width,
+        height: canvasTexture.height,
+        format: device.getFormat(),
+        requestId: state.requestId,
+        onSuccess: (dataUrl, requestId) => {
+          useScreenshotCaptureStore.getState().setCapturedImage(dataUrl, requestId)
+        },
+        onError: (error, requestId) => {
+          useScreenshotCaptureStore.getState().setError(error, requestId)
+        },
+      })
+    })
 
     return () => {
       graph.unregisterBeforeSubmitHook('screenshot-capture')
