@@ -10,6 +10,12 @@ import { computeSparklinePoints, FPS_COLORS, type FpsColorLevel, getFpsColorLeve
 
 type PrevValues = { fps: number; frameTime: number; colorLevel: FpsColorLevel | '' }
 
+// Shared by the initial render and the ref-based updater so a color-level
+// change swaps only the health class. The updater used to write
+// `h-2.5 w-2.5`, growing the dot out of its h-1.5 slot on the first change.
+const INDICATOR_BASE_CLASS = 'relative inline-flex rounded-full h-1.5 w-1.5'
+const FPS_TEXT_BASE_CLASS = 'text-base font-semibold font-mono leading-none tabular-nums'
+
 function updateFpsText(
   fps: number,
   prev: PrevValues,
@@ -53,10 +59,10 @@ function updateColorLevel(
   if (level === prev.colorLevel) return
   const color = FPS_COLORS[level]
   if (indicatorRef.current) {
-    indicatorRef.current.className = `relative inline-flex rounded-full h-2.5 w-2.5 ${color.bg}`
+    indicatorRef.current.className = `${INDICATOR_BASE_CLASS} ${color.bg}`
   }
   if (fpsContainerRef.current) {
-    fpsContainerRef.current.className = `text-base font-semibold font-mono leading-none tabular-nums ${color.text}`
+    fpsContainerRef.current.className = `${FPS_TEXT_BASE_CLASS} ${color.text}`
   }
   if (sparklineRef.current) {
     sparklineRef.current.setAttribute('stroke', color.stroke)
@@ -128,13 +134,14 @@ export const CollapsedView = React.memo(function CollapsedView() {
         <span className="relative flex h-1.5 w-1.5 self-center">
           <span
             ref={indicatorRef}
-            className={`relative inline-flex rounded-full h-1.5 w-1.5 ${initialColor.bg}`}
+            data-testid="fps-status-dot"
+            className={`${INDICATOR_BASE_CLASS} ${initialColor.bg}`}
           />
         </span>
         <span
           ref={fpsContainerRef}
           data-testid="fps-value"
-          className={`text-base font-semibold font-mono leading-none tabular-nums ${initialColor.text}`}
+          className={`${FPS_TEXT_BASE_CLASS} ${initialColor.text}`}
         >
           <span ref={fpsRef}>{initialState.fps}</span>
         </span>

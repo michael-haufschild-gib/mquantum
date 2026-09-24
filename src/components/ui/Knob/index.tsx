@@ -1,7 +1,7 @@
 import { m, PanInfo } from 'motion/react'
-import React, { useCallback, useId } from 'react'
+import React, { useCallback, useId, useRef } from 'react'
 
-import { clampKnobValue, normalizeKnobValue } from '@/components/ui/knobValue'
+import { clampKnobValue, knobValueFromPanOffset } from '@/components/ui/knobValue'
 import { Tooltip } from '@/components/ui/Tooltip'
 
 const DEFAULT_KNOB_LABEL = 'Knob'
@@ -80,23 +80,24 @@ export const Knob: React.FC<KnobProps> = React.memo(
       [value, min, max, onChange]
     )
 
-    // Pan Handler (Motion)
+    // Pan Handler (Motion). The value is derived from the TOTAL offset since
+    // pan start (upward drag increases it), snapped once — snapping each
+    // per-event delta swallowed every sub-half-step move on slow drags.
+    const panStartValueRef = useRef(value)
+    const handlePanStart = useCallback(() => {
+      panStartValueRef.current = value
+    }, [value])
     const handlePan = useCallback(
       (_: PointerEvent, info: PanInfo) => {
         if (range <= 0) return
-
-        // Negative deltaY means moving up, which should increase value
-        const deltaY = -info.delta.y
-
-        // Scale delta.
-        // sensitivity determines how "fast" it moves.
-        // Range = max - min.
-        // 100 pixels drag = full range?
-        const pixelRange = 200 // Pixels to traverse full range
-        const change = (deltaY / pixelRange) * range * sensitivity
-
-        const newValue = normalizeKnobValue(value + change, min, max, step)
-
+        const newValue = knobValueFromPanOffset(
+          panStartValueRef.current,
+          info.offset.y,
+          min,
+          max,
+          step,
+          sensitivity
+        )
         if (newValue !== value) {
           onChange(newValue)
         }
@@ -168,6 +169,7 @@ export const Knob: React.FC<KnobProps> = React.memo(
         <m.div
           className={`relative select-none touch-none outline-hidden group cursor-grab active:cursor-grabbing`}
           style={{ width: size, height: size }}
+          onPanStart={handlePanStart}
           onPan={handlePan}
           onDoubleClick={handleDoubleClick}
           role="slider"
@@ -216,7 +218,7 @@ export const Knob: React.FC<KnobProps> = React.memo(
               cy="20"
               r="18"
               fill="var(--color-control)"
-              stroke="var(--color-border)"
+              stroke="var(--color-border-default)"
               strokeWidth="2"
               strokeOpacity="0.1"
             />
@@ -253,7 +255,7 @@ export const Knob: React.FC<KnobProps> = React.memo(
                 cy="20"
                 r="14"
                 fill={`url(#body-grad-${id})`}
-                stroke="var(--color-border)"
+                stroke="var(--color-border-default)"
                 strokeOpacity="0.2"
                 strokeWidth="1"
               />

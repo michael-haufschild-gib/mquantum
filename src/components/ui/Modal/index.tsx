@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 import { Button } from '@/components/ui/Button'
 import { Z_INDEX } from '@/constants/zIndex'
@@ -135,7 +136,7 @@ export const Modal: React.FC<ModalProps> = React.memo(
 
     if (!isOpen) return null
 
-    return (
+    const dialog = (
       <div
         role="dialog"
         aria-modal="true"
@@ -194,6 +195,12 @@ export const Modal: React.FC<ModalProps> = React.memo(
         </div>
       </div>
     )
+
+    // Portal to <body> so Z_INDEX.MODAL is resolved in the root stacking
+    // context. Modals mounted inside EditorLayout's z-0 canvas layer (the
+    // Screenshot preview, MsgBox) were painted UNDER the z-10 UI overlay, so
+    // the inspector panel covered them and intercepted their buttons.
+    return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body)
   }
 )
 

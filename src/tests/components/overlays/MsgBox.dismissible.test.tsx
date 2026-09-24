@@ -361,3 +361,51 @@ describe('msgBoxStore dismissible options (invariants)', () => {
     expect(state.dismissId).toBeNull()
   })
 })
+
+// Regression: Escape / backdrop / the header close button went straight to
+// closeMsgBox, so a checked "Don't show again" was silently discarded and the
+// dialog kept coming back (the store persists to localStorage permanently).
+describe('MsgBox dismissible — non-action close paths', () => {
+  beforeEach(() => {
+    useDismissedDialogsStore.setState({ dismissedIds: new Set<string>() })
+    localStorage.clear()
+    useMsgBoxStore.setState({
+      isOpen: true,
+      title: 'Test',
+      message: 'Message',
+      type: 'info',
+      actions: [{ label: 'OK', onClick: vi.fn() }],
+      dismissible: true,
+      dismissId: 'close-path-dialog',
+    })
+  })
+
+  it('escape_checkboxChecked_persistsDismissAndCloses', async () => {
+    const user = userEvent.setup()
+    render(<MsgBox />)
+    await user.click(screen.getByRole('switch'))
+    await user.keyboard('{Escape}')
+
+    expect(useDismissedDialogsStore.getState().isDismissed('close-path-dialog')).toBe(true)
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+  })
+
+  it('closeButton_checkboxChecked_persistsDismiss', async () => {
+    const user = userEvent.setup()
+    render(<MsgBox />)
+    await user.click(screen.getByRole('switch'))
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    expect(useDismissedDialogsStore.getState().isDismissed('close-path-dialog')).toBe(true)
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+  })
+
+  it('escape_checkboxUnchecked_doesNotPersistDismiss', async () => {
+    const user = userEvent.setup()
+    render(<MsgBox />)
+    await user.keyboard('{Escape}')
+
+    expect(useDismissedDialogsStore.getState().isDismissed('close-path-dialog')).toBe(false)
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+  })
+})

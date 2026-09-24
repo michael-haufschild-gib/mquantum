@@ -119,6 +119,35 @@ describe('ScreenshotModal', () => {
     expect(saveBtn).toBeDisabled()
   })
 
+  it('hands clipboard.write a ClipboardItem synchronously within the click gesture', async () => {
+    // Regression: the PNG re-encode was awaited before clipboard.write(), which
+    // consumed the user activation — Safari then rejected the write. The
+    // ClipboardItem must be created immediately with a promise for the blob.
+    // MockImage (beforeEach) never loads, so the old code never reached write().
+    const itemPayloads: Array<Record<string, unknown>> = []
+    const originalClipboardItem = (globalThis as { ClipboardItem?: unknown }).ClipboardItem
+    ;(globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      constructor(items: Record<string, unknown>) {
+        itemPayloads.push(items)
+      }
+    }
+    try {
+      useScreenshotStore.setState({ isOpen: true, imageSrc: TINY_PNG })
+      // userEvent.setup() installs its own navigator.clipboard stub — spy after it.
+      const user = userEvent.setup()
+      const write = vi.spyOn(navigator.clipboard, 'write').mockResolvedValue(undefined)
+      renderWithProviders(<ScreenshotModal />)
+
+      await user.click(screen.getByTestId('screenshot-copy-button'))
+
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(itemPayloads).toHaveLength(1)
+      expect(itemPayloads[0]!['image/png']).toBeInstanceOf(Promise)
+    } finally {
+      ;(globalThis as { ClipboardItem?: unknown }).ClipboardItem = originalClipboardItem
+    }
+  })
+
   it('uses requested export filename when saving the screenshot', async () => {
     globalThis.Image = class MockLoadedImage {
       onload: (() => void) | null = null

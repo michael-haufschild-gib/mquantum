@@ -82,14 +82,21 @@ export const ScreenshotModal = () => {
 
   const handleCopy = async () => {
     try {
-      const blob = await generateOutput()
-      if (!blob) throw new Error('Failed to process image')
-
       if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
         throw new Error('Clipboard image copy is not supported in this browser.')
       }
 
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      // Build the ClipboardItem synchronously inside the click gesture and hand
+      // it a promise for the PNG. Awaiting the crop re-encode first consumed the
+      // user activation, so Safari rejected clipboard.write() (NotAllowedError).
+      const pngPromise = generateOutput().then((blob) => {
+        if (!blob) throw new Error('Failed to process image')
+        return blob
+      })
+      // Mark handled: if write() rejects first, this rejection is otherwise unobserved.
+      void pngPromise.catch(() => undefined)
+
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngPromise })])
       addToast('Copied screenshot to clipboard!', 'success')
       soundManager.playSuccess()
       closeModal()

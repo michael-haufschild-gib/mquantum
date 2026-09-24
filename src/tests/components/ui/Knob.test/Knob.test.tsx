@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Knob } from '@/components/ui/Knob'
-import { normalizeKnobValue } from '@/components/ui/knobValue'
+import {
+  KNOB_PAN_PIXEL_RANGE,
+  knobValueFromPanOffset,
+  normalizeKnobValue,
+} from '@/components/ui/knobValue'
 
 describe('Knob', () => {
   it('exposes slider semantics with correct aria attributes', () => {
@@ -122,5 +126,27 @@ describe('Knob', () => {
     expect(normalizeKnobValue(9, 1, 9, 5)).toBe(9)
     expect(normalizeKnobValue(1, 1, 9, 5)).toBe(1)
     expect(normalizeKnobValue(6, 1, 9, 5)).toBe(6)
+  })
+})
+
+// Regression: the pan handler snapped each per-event delta, so any pointer
+// event moving less than half a step rounded back to the current value — a
+// slow drag (e.g. 1 px/event on a 0..1 knob with step 0.01 and sensitivity
+// 0.5 → 0.0025 per event) never moved the knob.
+describe('knobValueFromPanOffset', () => {
+  it('moves on slow drags by snapping the accumulated offset', () => {
+    // 1 px events: offset grows 1, 2, 3 … ; each event alone is 0.0025 < ½·step.
+    const values = [1, 2, 4, 8].map((px) => knobValueFromPanOffset(0.5, -px, 0, 1, 0.01, 0.5))
+    expect(values).toEqual([0.5, 0.51, 0.51, 0.52])
+  })
+
+  it('maps a full-range upward drag to max and downward to min', () => {
+    expect(knobValueFromPanOffset(0, -KNOB_PAN_PIXEL_RANGE, 0, 100, 1, 1)).toBe(100)
+    expect(knobValueFromPanOffset(100, KNOB_PAN_PIXEL_RANGE * 3, 0, 100, 1, 1)).toBe(0)
+  })
+
+  it('returns the clamped start value for a degenerate range or offset', () => {
+    expect(knobValueFromPanOffset(5, -50, 3, 3, 1, 1)).toBe(3)
+    expect(knobValueFromPanOffset(0.4, Number.NaN, 0, 1, 0.1, 1)).toBe(0.4)
   })
 })
