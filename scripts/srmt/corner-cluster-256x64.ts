@@ -22,9 +22,10 @@ import {
 import {
   solveWheelerDeWitt,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '../../src/lib/physics/wheelerDeWitt/solver'
 
-const CASES: Array<{ label: string; wdw: WheelerDeWittSolverInput }> = [
+const CASES: Array<{ label: string; wdw: WheelerDeWittSolverInput3D }> = [
   ['noBoundary', 0.2, -0.5],
   ['noBoundary', 0.2, -0.25],
   ['tunneling', 0.2, -0.5],
@@ -81,7 +82,9 @@ for (const { label, wdw } of CASES) {
   const rigidPhi2 = rp2.qualityMetrics?.rigid ?? Number.NaN
   const rigidChamp = findChampionClock({ a: rigidA, phi1: rigidPhi1, phi2: rigidPhi2 })
   const margin = Math.min(rigidPhi1, rigidPhi2) / Math.max(rigidA, 1e-30)
-  const wkbChamp = findWkbChampion(computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax))
+  const wkbChamp = findWkbChampion(
+    computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
+  )
   const boChamp = findBornOppenheimerChampion(computeBornOppenheimerRates(out.chi, out.gridSize))
 
   const c3 = wkbChamp !== 'a'

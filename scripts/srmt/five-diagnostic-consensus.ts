@@ -36,10 +36,10 @@ import {
 } from '../../src/lib/physics/srmt'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '../../src/lib/physics/wheelerDeWitt/solver'
 
-const CASES: Array<{ label: string; wdw: WheelerDeWittSolverInput }> = [
+const CASES: Array<{ label: string; wdw: WheelerDeWittSolverInput3D }> = [
   {
     label: 'm=0.3 Λ=+0.1 noBoundary',
     wdw: {
@@ -128,7 +128,9 @@ for (const { label, wdw } of CASES) {
     phi1: rp1.qualityMetrics?.rigid ?? Number.NaN,
     phi2: rp2.qualityMetrics?.rigid ?? Number.NaN,
   })
-  const wkbChamp = findWkbChampion(computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax))
+  const wkbChamp = findWkbChampion(
+    computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
+  )
   const pwChamp = findPageWoottersChampion(computePageWoottersRates(out.chi, out.gridSize))
   const csChamp = findCutStabilityChampion(
     computeCutStability(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
