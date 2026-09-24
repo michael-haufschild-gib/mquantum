@@ -193,6 +193,8 @@ fn wzMap3(p: vec3f, w: f32, t: f32) -> vec2f {
 }
 
 // ── Mode 4: Third-Quantized Multiverse — prime constellation, Hagedorn glow. ──
+// Sphere-tracing cost caps the constellation at this many prime nodes.
+const WZ_PRIMON_MAX_NODES: i32 = 16;
 fn wzMap4(p: vec3f, w: f32, t: f32) -> vec2f {
   let H = wzHeadA();
   let count = i32(round(H.y));
@@ -200,11 +202,14 @@ fn wzMap4(p: vec3f, w: f32, t: f32) -> vec2f {
   let pair = H.z > 0.5;
   let linkG = wzHeadB().y;
   let occS = wzHeadB().z;
-  let cf = max(1.0, f32(count));
+  // Fibonacci spacing over the nodes actually drawn: spacing by the full prime
+  // count (8..120) packed the 16 drawn nodes into a polar cap (cos θ ≥ 0.65 at
+  // count 90) instead of covering the sphere in the AdS / k-shell layouts.
+  let cf = f32(clamp(count, 1, WZ_PRIMON_MAX_NODES));
   var d = 1e9;
   var mat = WZ_EMIT_WARM;
   let f4 = wzFourth(); // hoisted out of the node loop (it is a storage read)
-  for (var i = 0; i < 16; i++) {
+  for (var i = 0; i < WZ_PRIMON_MAX_NODES; i++) {
     if (i >= count) { break; }
     let aux = wzAux(i);
     let pr = aux.x;
@@ -248,6 +253,15 @@ fn wzMap4(p: vec3f, w: f32, t: f32) -> vec2f {
     let pulse = 1.0 + 0.12 * sin(t * 2.0 + pr);
     let ds = length(p - pos) - rr * pulse;
     if (ds < d) { d = ds; mat = WZ_EMIT_WARM; }
+    // universe–antiuniverse link tube to the antipode −p (third-quantized pairing).
+    // Dropped in the 4D rewrite while the pairLinks / linkGain controls and the
+    // "Paired Vacuum" scenario kept driving it. Restored on the warped node (the
+    // 4D fold carries the pair with it) as a LIT matte tube (matId 4): the old
+    // thin emissive tube bloomed to white bars.
+    if (pair && linkG > 0.001) {
+      let link = sdCapsule(p, pos, -pos, 0.005 + 0.012 * linkG);
+      if (link < d) { d = link; mat = 4.0; }
+    }
   }
   return vec2f(d, mat);
 }

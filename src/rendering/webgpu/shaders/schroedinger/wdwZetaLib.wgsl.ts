@@ -137,6 +137,17 @@ fn wzSmin(a: f32, b: f32, k: f32) -> f32 {
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
+/**
+ * The stops below are matplotlib's sRGB-encoded viridis; the pipeline is
+ * linear and ToScreenPass sRGB-encodes the frame, so decode them here
+ * (as emission.wgsl's viridis does) or the ramp is encoded twice.
+ */
+fn wzSrgbToLinear(c: vec3f) -> vec3f {
+  let lo = c / 12.92;
+  let hi = pow((c + vec3f(0.055)) / 1.055, vec3f(2.4));
+  return select(hi, lo, c <= vec3f(0.04045));
+}
+
 // ── Perceptual palettes ──
 fn wzViridis(tIn: f32) -> vec3f {
   let t = clamp(tIn, 0.0, 1.0);
@@ -154,7 +165,7 @@ fn wzViridis(tIn: f32) -> vec3f {
     let u = (t - 0.75) / 0.25;
     r = mix(0.373, 0.993, u); g = mix(0.785, 0.906, u); b = mix(0.380, 0.144, u);
   }
-  return vec3f(r, g, b);
+  return wzSrgbToLinear(vec3f(r, g, b));
 }
 fn wzThermal(tIn: f32) -> vec3f {
   let t = clamp(tIn, 0.0, 1.0);
@@ -239,7 +250,8 @@ fn wzMertens(p: vec3f) -> vec3f {
 }
 
 // Explicit-Formula Wave: the ζ-zeros' oscillatory contribution to ψ(x),
-// Σ_n cos(γₙ·log x)/√(¼+γₙ²) — cyan↔magenta by the sign/strength of the wave.
+// −Σ_ρ x^ρ/(ρ√x) = −2Σ_n cos(γₙ·log x − arg ρₙ)/|ρₙ| — cyan↔magenta by the
+// sign/strength of the wave.
 fn wzExplicitFormula(p: vec3f) -> vec3f {
   let o = wzMeasure(wzSpectralU(p)).w; // ∈ [−1,1]
   return mix(vec3f(0.85, 0.22, 0.6), vec3f(0.2, 0.75, 0.85), 0.5 + 0.5 * o);
@@ -325,17 +337,19 @@ fn wzColorAlgo(algo: i32, p: vec3f, matId: f32, s: f32) -> vec4f {
     let f = wzFieldAt(u, clamp((p.z + 1.3) / 2.6, 0.0, 1.0));
     return vec4f(hsl2rgb(fract(f.y / WZ_TAU + 0.5), 0.82, 0.16 + 0.30 * f.x + 0.26 * f.z), 1.0);
   }
-  // Möbius Triad (moebiusNoBoundary): μ(n) → gold / void / indigo.
+  // Möbius Triad (moebiusNoBoundary): μ(n) → gold / void / indigo. Same cell
+  // index as the mode-1 lacework (mainWdwZetaVolume) so the colour names the
+  // cell's own μ(n): direct table index, cutoff clamped to the 111 baked entries.
   if (algo == 34) {
     let curv = wzHeadA().w;
-    let cutoff = max(8.0, wzHeadA().y);
+    let cutoff = clamp(wzHeadA().y, 8.0, 111.0);
     let r = clamp(length(p.xz), 0.0, 0.985);
     let hb = 0.5 * log((1.0 + r) / (1.0 - r));
     let ringF = hb * (1.5 + 2.5 * curv);
     let ri = min(floor(ringF), 5.0);
     let sf = atan2(p.z, p.x) / WZ_TAU * (6.0 * pow(2.0, ri)) + 0.5;
     let idx = (i32(ri) * 17 + i32(floor(sf))) % i32(cutoff);
-    let mu = wzAux(abs(idx) % 48).x;
+    let mu = wzAux(abs(idx)).x;
     if (mu > 0.5) { return vec4f(wzGold(0.62), 1.0); }
     if (mu < -0.5) { return vec4f(0.20, 0.17, 0.55, 1.0); }
     return vec4f(0.02, 0.02, 0.035, 1.0);

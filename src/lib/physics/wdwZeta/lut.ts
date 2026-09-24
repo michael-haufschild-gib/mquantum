@@ -43,6 +43,8 @@ export const WDW_ZETA_ZEROS_OFFSET = 2
 export const WDW_ZETA_ZEROS_COUNT = 48
 /** First LUT index of the per-mode auxiliary block. */
 export const WDW_ZETA_AUX_OFFSET = WDW_ZETA_ZEROS_OFFSET + WDW_ZETA_ZEROS_COUNT
+/** μ(n) entries baked for the Möbius lacework: n = 1..111 (`wzAux` clamps its index at 110). */
+export const WDW_ZETA_MOEBIUS_LACE_COUNT = 111
 /**
  * 2D analytic-field block: a `NX × NY` grid (row-major, `idx = y·NX + x`) of the
  * mode's *actually computed* complex field — the completed ξ(σ+it) over the
@@ -64,7 +66,8 @@ export const WDW_ZETA_FIELD_OFFSET = 128
  *   .x = N(t)  — Riemann zero-count staircase (count of ζ-zeros with ordinate ≤ t)
  *   .y = ψ(x)  — Chebyshev prime staircase Σ_{pᵏ≤x} log p   (normalized to [0,1])
  *   .z = M(x)  — Mertens summatory Σ_{n≤x} μ(n)             (normalized to [−1,1])
- *   .w = osc   — explicit-formula oscillation Σ_n cos(γₙ·log x)/√(¼+γₙ²)  ([−1,1])
+ *   .w = osc   — explicit-formula oscillation −Σ_ρ x^ρ/(ρ√x)
+ *                = −2Σ_n cos(γₙ·log x − arg ρₙ)/|ρₙ|                  ([−1,1])
  * The four shared color algorithms (29-32) map each surface point's spectral
  * coordinate into this table — so the colour encodes a genuine measure, not
  * surface orientation or lighting.
@@ -254,8 +257,10 @@ function bakeTurningField(lut: Float32Array, m: number, lam: number, asym: numbe
 /**
  * Li / Keiper coefficients λ_n = Σ_ρ [1 − (1 − 1/ρ)^n] over the non-trivial
  * zeros (conjugate-paired ⇒ real). Li's criterion: **RH ⟺ λ_n ≥ 0 for all n**.
- * An off-line zero drives some λ_n negative — the literal ghost. Returns the
- * sequence; the caller stores it (normalized) for the positivity-bowl relief.
+ * An off-line zero drives some λ_n negative — but only once |1 − 1/ρ|^n has
+ * grown past the on-line sum; for a ghost at γ₀ ≈ 14.13 that onset lies far
+ * beyond n = 40 (λ_1..λ_40 stay positive). Returns the sequence; the caller
+ * stores it (normalized) for the positivity-bowl relief.
  */
 function liCoefficients(count: number, n: number, ghost: boolean, ghostDelta: number): number[] {
   const lambda = new Array<number>(n + 1).fill(0)
@@ -276,9 +281,15 @@ function liCoefficients(count: number, n: number, ghost: boolean, ghostDelta: nu
     addZero(0.5, -g) // conjugate ρ̄ = ½ − iγ
   }
   if (ghost) {
+    // Full functional-equation quartet ½±δ ± iγ₀ (as bakeXiField multiplies
+    // in): ξ(s) = ξ(1−s) forces 1−ρ alongside ρ. Only the Re ρ < ½ pair has
+    // |1 − 1/ρ| > 1, i.e. the only terms that can drive λ_n negative — the
+    // ½+δ pair alone keeps every term ≥ 1 − |1 − 1/ρ|^n > 0.
     const g0 = RIEMANN_ZEROS[0]!
-    addZero(0.5 + ghostDelta, g0) // off-line zero
-    addZero(0.5 + ghostDelta, -g0)
+    addZero(0.5 + ghostDelta, g0) // off-line zero ρ
+    addZero(0.5 + ghostDelta, -g0) // ρ̄
+    addZero(0.5 - ghostDelta, g0) // 1 − ρ̄
+    addZero(0.5 - ghostDelta, -g0) // 1 − ρ
   }
   return lambda
 }
@@ -348,10 +359,14 @@ function bakeSharedMeasures(lut: Float32Array): void {
     // Mertens M(x) = Σ_{n ≤ x} μ(n).
     let M = 0
     for (let n = 1; n <= Math.floor(x); n++) M += moebiusMu(n)
-    // Explicit-formula oscillation: the ζ-zeros' contribution Σ_n cos(γₙ·log x)/√(¼+γₙ²).
+    // Explicit-formula oscillation: the ζ-zeros' contribution −Σ_ρ x^ρ/ρ to ψ(x),
+    // per conjugate pair −2√x·cos(γ·log x − arg ρ)/|ρ| with arg ρ = atan2(γ, ½)
+    // (≈ π/2, so the wave is ≈ −sin, not cos). Stored divided by √x.
     let osc = 0
     const lx = Math.log(x)
-    for (const g of RIEMANN_ZEROS) osc += Math.cos(g * lx) / Math.sqrt(0.25 + g * g)
+    for (const g of RIEMANN_ZEROS) {
+      osc -= (2 * Math.cos(g * lx - Math.atan2(g, 0.5))) / Math.sqrt(0.25 + g * g)
+    }
     rawN.push(Nt)
     rawPsi.push(psi)
     rawM.push(M)
@@ -397,8 +412,13 @@ function buildMoebius(lut: Float32Array, c: MoebiusNoBoundaryConfig): void {
   setVec4(lut, 0, c.maxDepth, c.moebiusCutoff, c.domeHeight, c.curvature)
   // header B: WDW boundary-condition morph + the Möbius partial sum.
   setVec4(lut, 1, c.tunnelMix, M, 0, 0)
-  // Möbius lacework weights μ(n)/n (the squarefree-void pattern).
-  const K = 48
+  // Möbius lacework weights μ(n)/n (μ = 0 voids at the non-squarefree n). The
+  // shader indexes aux[n−1] for every n below the cutoff (UI max 120), so bake
+  // up to wzAux's clamp (index 110 → n = 111) and clamp the cutoff there; the
+  // old 48-entry table was read modulo 48, showing μ(n − 48) for n > 48 at the
+  // default cutoff 60. Entries past index 77 overlap the 2D-field block, which
+  // this mode never bakes or samples.
+  const K = WDW_ZETA_MOEBIUS_LACE_COUNT
   for (let n = 1; n <= K; n++) {
     const mu = moebiusMu(n)
     setVec4(lut, WDW_ZETA_AUX_OFFSET + (n - 1), mu, mu / n, n, 0)
@@ -479,7 +499,8 @@ function buildAdelic(lut: Float32Array, c: AdelicWavefunctionConfig): void {
 function buildWeil(lut: Float32Array, c: WeilPositivityConfig): void {
   writeZeros(lut)
   // Real Li/Keiper coefficients λ_n — RH ⟺ λ_n ≥ 0 ∀n (Li's criterion). The
-  // off-line zero drives some λ_n negative: the literal ghost the bowl carves.
+  // off-line quartet perturbs λ_n, but its negativity onset lies beyond the
+  // NLI indices baked here (see liCoefficients), so minLambda stays ≥ 0.
   const NLI = 40
   const lambda = liCoefficients(Math.round(c.zeroCount), NLI, c.offLineZero, c.offLineOffset)
   let maxAbs = 1e-6

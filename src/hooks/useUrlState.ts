@@ -559,6 +559,25 @@ function applyWdwParams(
 }
 
 /**
+ * Apply WDW ⊗ ζ suite params while keeping the link's explicit dimension. A
+ * suite preset re-runs its scenario dimension guard (4D scenario → d = 4), but
+ * a shared link carries the sender's `d`, which may differ (the user changed
+ * dimension after picking the scenario); without restoring it the link
+ * reopened at the scenario's authored dimension. When the dimensions agree the
+ * guard's authored rotation is kept.
+ */
+function applyWdwZetaParamsKeepingDimension(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  const dimBefore = useGeometryStore.getState().dimension
+  applyWdwZetaParams(urlState, ext)
+  if (urlState.dimension !== undefined && useGeometryStore.getState().dimension !== dimBefore) {
+    useGeometryStore.getState().setDimension(dimBefore)
+  }
+}
+
+/**
  * Queue the SRMT sweep configuration from URL params so the sweep
  * section can auto-dispatch it once the Wheeler–DeWitt strategy has
  * produced its first solver output. No-op when `sw` is absent.
@@ -737,7 +756,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
     if (effectiveQuantumMode === 'bifurcationHorizon') applyBifurcationHorizonParams(urlState, ext)
     if (effectiveQuantumMode === 'modularKnot') applyModularKnotParams(urlState, ext)
-    if (isWdwZetaMode(effectiveQuantumMode)) applyWdwZetaParams(urlState, ext)
+    if (isWdwZetaMode(effectiveQuantumMode)) applyWdwZetaParamsKeepingDimension(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {

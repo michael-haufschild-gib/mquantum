@@ -66,10 +66,11 @@ fn wzAlbedo(mode: i32, p: vec3f, n: vec3f, t: f32, matId: f32) -> vec3f {
   if (mode == 1) {
     // Hyperbolic modular mandala on the Poincaré disk: cells compress toward the
     // boundary (hyperbolic metric), coloured by the Möbius value μ(n) so the
-    // squarefree μ = 0 cells open a dark lacework. Bright cell edges trace the
+    // non-squarefree μ = 0 cells open a dark lacework. Bright cell edges trace the
     // SL(2,ℤ) tessellation.
     let curv = wzHeadA().w;          // hyperbolic curvature → ring density
-    let cutoff = max(8.0, wzHeadA().y); // Möbius cutoff N → lacework fineness
+    // Möbius cutoff N → lacework fineness; ≤ 111 = the μ(n) entries baked.
+    let cutoff = clamp(wzHeadA().y, 8.0, 111.0);
     let r = clamp(length(p.xz), 0.0, 0.985);
     let hb = 0.5 * log((1.0 + r) / (1.0 - r)); // hyperbolic radius (→∞ at rim)
     let th = atan2(p.z, p.x);
@@ -78,8 +79,8 @@ fn wzAlbedo(mode: i32, p: vec3f, n: vec3f, t: f32, matId: f32) -> vec3f {
     let secCount = 6.0 * pow(2.0, ri); // cells double each hyperbolic ring
     let sf = th / WZ_TAU * secCount + 0.5;
     let idx = (i32(ri) * 17 + i32(floor(sf))) % i32(cutoff);
-    let mu = wzAux(abs(idx) % 48).x; // μ(n) ∈ {−1,0,+1}
-    let voids = abs(mu);             // 0 → dark squarefree void
+    let mu = wzAux(abs(idx)).x; // μ(n) ∈ {−1,0,+1}, n = |idx| + 1 < cutoff + 1
+    let voids = abs(mu);        // 0 → dark void at a non-squarefree n
     let edge = smoothstep(0.0, 0.14, min(fract(ringF), 1.0 - fract(ringF))) *
                smoothstep(0.0, 0.14, min(fract(sf), 1.0 - fract(sf)));
     // no-boundary amplitude tinted by the real Möbius partial sum M (header B.y)
@@ -113,6 +114,10 @@ fn wzAlbedo(mode: i32, p: vec3f, n: vec3f, t: f32, matId: f32) -> vec3f {
       col = mix(col, col * 1.3 + vec3f(0.12, 0.16, 0.22), foam * vg);
     }
     return col;
+  }
+  if (mode == 4) {
+    // universe–antiuniverse link tubes (the only lit primon surface)
+    return vec3f(0.30, 0.46, 0.72);
   }
   if (mode == 6) {
     // warm expanding branch / cool contracting branch
@@ -318,8 +323,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     // Flat reliefs (seam ξ, modular dome, Airy fold, positivity bowl) are matte —
     // a glossy specular would flare a white sheet across the aligned surface. The
     // 𝔽₁ spire (mode 10) is matte too: its thin curved ring-tubes are grazing
-    // almost everywhere, so a glossy spec would blow every ring to white.
-    let matte = mode == 0 || mode == 1 || mode == 3 || mode == 9 || mode == 10;
+    // almost everywhere, so a glossy spec would blow every ring to white; the
+    // primon link tubes (mode 4) are thin for the same reason.
+    let matte = mode == 0 || mode == 1 || mode == 3 || mode == 4 || mode == 9 || mode == 10;
     let rough = select(0.45, 0.9, matte);
     col = wzShade(hp, n, rd, albedo, ao, rough);
     // glowing ζ structure painted on the lit form (seam-zero bands, contours…)
