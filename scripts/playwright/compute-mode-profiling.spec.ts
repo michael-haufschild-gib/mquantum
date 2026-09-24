@@ -456,12 +456,14 @@ test.describe('FSF cosmology & preheating', () => {
         (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarCosmologyEnabled(true)
-      s.setFreeScalarCosmologyPreset('kasner')
+      // Bianchi-I lives on the η > 0 gauge; the isotropic 'kasner' preset
+      // (η < 0) is a different background despite the shared name.
+      s.setFreeScalarCosmologyPreset('bianchiKasner')
       s.setFreeScalarCosmologyEta0(1.5)
       s.setFreeScalarInitialCondition('vacuumNoise')
     })
     await waitForShaderCompilation(page)
-    await profileScenario(page, 'FSF: Kasner (Bianchi-I)', 'freeScalarField', 'kasner')
+    await profileScenario(page, 'FSF: Kasner (Bianchi-I)', 'freeScalarField', 'bianchiKasner')
   })
 
   test('FSF: preheating (Mathieu drive)', async ({ page }) => {

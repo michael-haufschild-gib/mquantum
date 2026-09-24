@@ -20,6 +20,7 @@ import {
   readBecDiagnostics,
   requireWebGPU,
   waitForFrameAdvance,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -41,7 +42,8 @@ async function waitForSpectrumData(
   page: import('@playwright/test').Page,
   timeoutMs = 30_000
 ): Promise<void> {
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const s = mod.useDiagnosticsStore.getState().bec

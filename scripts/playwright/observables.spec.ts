@@ -19,6 +19,7 @@ import {
   gotoModeWithParams,
   requireWebGPU,
   waitForFirstFrame,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -73,7 +74,8 @@ async function setupTdseWithObservables(page: import('@playwright/test').Page) {
 
 /** Wait for the observables diagnostic store to receive data from GPU readback. */
 async function waitForObservablesData(page: import('@playwright/test').Page) {
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async () => {
       const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().observables.hasData

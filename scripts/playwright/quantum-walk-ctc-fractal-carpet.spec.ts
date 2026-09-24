@@ -12,6 +12,7 @@ import {
   snapshotDistance,
   waitForFrameAdvance,
   waitForModeReady,
+  waitForPageCondition,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
 
@@ -61,7 +62,8 @@ async function applyPresetThroughSelector(
   await selector.selectOption(presetId)
 
   const expected = PRESETS[presetId]
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     async ({ coinType, coinBias, coinInitial, stepsPerFrame }) => {
       const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const qw = mod.useExtendedObjectStore.getState().schroedinger.quantumWalk

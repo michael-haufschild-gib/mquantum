@@ -29,6 +29,7 @@ import {
   getFrameCount,
   getQuantumWalkConfig,
   gotoMode,
+  gotoModeWithParams,
   pauseAnimation,
   readMeasurementState,
   readObservablesDiagnostics,
@@ -41,6 +42,7 @@ import {
   waitForFirstFrame,
   waitForFrameAdvance,
   waitForFreshReadback,
+  waitForPageCondition,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -195,7 +197,8 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
     await waitForSimulationFrames(page, 120)
 
     // Poll until observables store has data
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
@@ -283,7 +286,9 @@ test.describe('B2: Data Export — content integrity', () => {
     await page.goto('/')
     await requireWebGPU(page, test.info())
 
-    await gotoMode(page, 'tdseDynamics', 3)
+    // TDSE diagnostics default to off; without diag=1 the tdse channel never
+    // receives data and the wait below timed out.
+    await gotoModeWithParams(page, 'tdseDynamics', 3, { diag: '1' })
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
@@ -731,7 +736,8 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
 
     await waitForSimulationFrames(page, 120)
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData

@@ -92,8 +92,10 @@ test.describe('open quantum drawer', () => {
     await panel.openQToggle.click()
     await panel.expectOpenQuantumDrawerVisible()
 
-    // Decoherence panel should be visible (it's the main panel in the drawer)
-    await expect(page.getByTestId('openq-panel-controls')).toBeVisible({ timeout: 5000 })
+    // Decoherence panel should be visible (it's the main panel in the drawer).
+    // The former `openq-panel-controls` wrapper was removed in the
+    // DrawerSection refactor; the main section now carries `openq-panel-main`.
+    await expect(page.getByTestId('openq-panel-main')).toBeVisible({ timeout: 5000 })
   })
 
   test('enabling open quantum with sufficient terms shows decoherence panel', async ({ page }) => {
