@@ -19,6 +19,7 @@ import type { AnimationSnapshot } from '../../core/storeAccess'
 import { getStoreSnapshot } from '../../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { WebGPUBaseComputePass } from '../../core/WebGPUBasePass'
+import { SCHROEDINGER_LAYOUT } from '../../renderers/schroedingerLayout'
 import { composeDensityGridComputeShader } from '../../shaders/schroedinger/compute/compose'
 import { DensityDistributionAnalyzer } from '../DensityDistributionAnalysis'
 import type {
@@ -44,6 +45,11 @@ const DEFAULT_GRID_SIZE = 64
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
 const MAX_DENSITY_GRID_SIZE = 4096
+
+// Time-dependent SchroedingerUniforms regions refreshed between version bumps.
+const SCHROEDINGER_TIME_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
+const SCHROEDINGER_PRECOMPUTED_TERM_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.precomputedTerm
+const SCHROEDINGER_PRECOMPUTED_TERM_BYTE_SIZE = SCHROEDINGER_LAYOUT.byteSize.precomputedTerm
 
 export type { DensityGridComputeConfig }
 
@@ -282,12 +288,50 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   updateSchroedingerUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
     if (!this.schroedingerBuffer) return
-    if (version === this.lastSchroedingerVersion) return
+    if (version === this.lastSchroedingerVersion) {
+      // No tracked parameter changed, but a multi-term superposition still
+      // evolves: needsUpdate() schedules a recompute per time bucket, so the
+      // compute copy must carry this frame's time and host-precomputed
+      // term_k = c_k·e^{-iE_k t}. Without this the recompute re-evaluated the
+      // snapshot taken at the last version bump and the grid froze in time.
+      if (this.isTimeDependent()) {
+        device.queue.writeBuffer(
+          this.schroedingerBuffer,
+          SCHROEDINGER_TIME_BYTE_OFFSET,
+          data,
+          SCHROEDINGER_TIME_BYTE_OFFSET,
+          4
+        )
+        device.queue.writeBuffer(
+          this.schroedingerBuffer,
+          SCHROEDINGER_PRECOMPUTED_TERM_BYTE_OFFSET,
+          data,
+          SCHROEDINGER_PRECOMPUTED_TERM_BYTE_OFFSET,
+          SCHROEDINGER_PRECOMPUTED_TERM_BYTE_SIZE
+        )
+      }
+      return
+    }
 
     device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
     this.needsRecompute = true
     this.shouldRefreshDistribution = true
     this.lastSchroedingerVersion = version
+  }
+
+  /**
+   * Whether |ψ(x,t)|² changes with time for this pass: multi-term HO
+   * superpositions do. Single eigenstates — including every hydrogen orbital,
+   * whose renderer config still carries the HO store's termCount — are
+   * stationary, and density-matrix mode carries its time evolution in the
+   * CPU-evolved ρ uniforms.
+   */
+  private isTimeDependent(): boolean {
+    return (
+      (this.passConfig.quantumMode ?? 'harmonicOscillator') === 'harmonicOscillator' &&
+      (this.passConfig.termCount ?? 1) > 1 &&
+      !this.passConfig.useDensityMatrix
+    )
   }
 
   /**
@@ -392,8 +436,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // Single eigenstates (termCount=1) are stationary.
     // Density matrix mode: time evolution lives in the CPU-evolved density matrix,
     // not in per-pixel phase factors — skip the time-bucket trigger.
-    const termCount = this.passConfig.termCount ?? 1
-    if (termCount > 1 && !this.passConfig.useDensityMatrix) {
+    if (this.isTimeDependent()) {
       const bucket = Math.floor(time * 60.0)
       if (bucket !== this.lastTimeBucket) return true
     }
@@ -421,6 +464,15 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const time = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     if (!this.needsUpdate(time, this.passConfig.dimension, this.passConfig.quantumMode)) {
+      // Service a refresh deferred while a readback was in flight (see
+      // settleReadback): the grid is current, only its analysis is stale.
+      // A static state never recomputes, so without this the deferred
+      // refresh waited for the next parameter change.
+      if (this.shouldRefreshDistribution && !this.readbackInFlight) {
+        const rbState = this.getReadbackState()
+        refreshDensityDistribution(ctx, rbState)
+        this.applyReadbackState(rbState)
+      }
       return
     }
 
@@ -466,8 +518,22 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // pass to propagate `readbackInFlight = false` once mapAsync resolves —
     // otherwise the flag is stuck at true and every subsequent
     // refreshDensityDistribution is silently skipped.
-    startPendingReadback(rbState, this.device, (s) => this.applyReadbackState(s))
+    startPendingReadback(rbState, this.device, (s) => this.settleReadback(s))
     this.applyReadbackState(rbState)
+  }
+
+  /**
+   * Completion hook for {@link startPendingReadback}: clears the in-flight
+   * flag and adopts a refresh requested by a failed map, but never clears a
+   * pending refresh. The snapshot it receives was taken at postFrame time;
+   * copying all of it back overwrote `shouldRefreshDistribution = true` set
+   * by a parameter / world-bound change that arrived while mapAsync was
+   * pending, so the density analysis (confidence threshold, density
+   * diagnostics, slices) stayed on the pre-change grid until the next change.
+   */
+  private settleReadback(state: DensityReadbackState): void {
+    this.readbackInFlight = state.readbackInFlight
+    if (state.shouldRefreshDistribution) this.shouldRefreshDistribution = true
   }
 
   getTextureFormat(): 'r16float' | 'rgba16float' {
