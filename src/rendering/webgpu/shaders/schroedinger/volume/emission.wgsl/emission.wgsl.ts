@@ -112,10 +112,20 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   // viridis(): algorithms 19 (Viridis) and 21 (Density Contours)
   if (colorAlgorithm === 19 || colorAlgorithm === 21) {
     parts.push(/* wgsl */ `
-// Viridis colormap — 5-stop piecewise-linear approximation in linear RGB.
-// Stops at t = 0.0, 0.25, 0.5, 0.75, 1.0 derived from the 11-point reference
-// LUT in src/lib/physics/colormaps.ts (0.25 and 0.75 are midpoints between
-// adjacent control points).
+// Viridis colormap — 5-stop piecewise-linear approximation. Stops at
+// t = 0.0, 0.25, 0.5, 0.75, 1.0 derived from the 11-point reference LUT in
+// src/lib/physics/colormaps.ts (0.25 and 0.75 are midpoints between adjacent
+// control points). Those values are sRGB-ENCODED (matplotlib's definition);
+// the volume pipeline is linear and ToScreenPass applies linearToSRGB, so the
+// interpolated sRGB colour is decoded to linear on return — returning the raw
+// stops double-encoded them (viridis(0) displayed ≈ (0.56, 0.06, 0.61)
+// instead of (0.27, 0.00, 0.33)), washing out the perceptually uniform ramp.
+fn viridisSrgbToLinear(c: vec3f) -> vec3f {
+  let lo = c / 12.92;
+  let hi = pow((c + vec3f(0.055)) / 1.055, vec3f(2.4));
+  return select(hi, lo, c <= vec3f(0.04045));
+}
+
 fn viridis(t: f32) -> vec3f {
   var r: f32; var g: f32; var b: f32;
   if (t < 0.25) {
@@ -131,7 +141,7 @@ fn viridis(t: f32) -> vec3f {
     let u = (t - 0.75) / 0.25;
     r = mix(0.373, 0.993, u); g = mix(0.785, 0.906, u); b = mix(0.380, 0.144, u);
   }
-  return vec3f(r, g, b);
+  return viridisSrgbToLinear(vec3f(r, g, b));
 }`)
   }
 

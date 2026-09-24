@@ -69,6 +69,17 @@ const HP_ALGO_BLACKBODY: i32 = 5;
 const HP_ALGO_VIRIDIS: i32 = 19;
 const HP_ALGO_DENSITY_CONTOURS: i32 = 21;
 
+/**
+ * The stops below are matplotlib's sRGB-encoded viridis; the pipeline is
+ * linear and ToScreenPass sRGB-encodes the frame, so decode them here
+ * (as emission.wgsl's viridis does) or the ramp is encoded twice.
+ */
+fn hpSrgbToLinear(c: vec3f) -> vec3f {
+  let lo = c / 12.92;
+  let hi = pow((c + vec3f(0.055)) / 1.055, vec3f(2.4));
+  return select(hi, lo, c <= vec3f(0.04045));
+}
+
 /** Compact viridis ramp (5-stop piecewise-linear, matches emission.wgsl). */
 fn hpViridis(tIn: f32) -> vec3f {
   let t = clamp(tIn, 0.0, 1.0);
@@ -86,7 +97,7 @@ fn hpViridis(tIn: f32) -> vec3f {
     let u = (t - 0.75) / 0.25;
     r = mix(0.373, 0.993, u); g = mix(0.785, 0.906, u); b = mix(0.380, 0.144, u);
   }
-  return vec3f(r, g, b);
+  return hpSrgbToLinear(vec3f(r, g, b));
 }
 
 /** Compact thermal ramp: dim red -> orange -> white-hot by normalized density. */
