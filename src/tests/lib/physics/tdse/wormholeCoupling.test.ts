@@ -335,3 +335,32 @@ describe('normalizeMirrorAxisForLattice', () => {
     expect(normalizeMirrorAxisForLattice(Number.NaN, 3)).toBe(0)
   })
 })
+
+// Regression: imaginary-time runs applied the unitary kick exp(−i·τg·P_M),
+// so the ground-state search ignored the g·P_M term of the Hamiltonian.
+describe('applyWormholeCoupling in imaginary time', () => {
+  it('scales the P_M = ±1 sectors by e^{∓τg} (exp(−τg·P_M))', () => {
+    const x = 0.3
+    const symmetric = new Float32Array([1, 0.5, 1, 0.5])
+    const antisymmetric = new Float32Array([1, 0.5, -1, -0.5])
+    applyWormholeCoupling(symmetric, [2], 0, x, 1, true)
+    applyWormholeCoupling(antisymmetric, [2], 0, x, 1, true)
+    expect(symmetric[0]).toBeCloseTo(Math.exp(-x), 6)
+    expect(symmetric[3]).toBeCloseTo(0.5 * Math.exp(-x), 6)
+    expect(antisymmetric[0]).toBeCloseTo(Math.exp(x), 6)
+    expect(antisymmetric[2]).toBeCloseTo(-Math.exp(x), 6)
+  })
+
+  it('relaxes a mostly symmetric state onto the P_M = −1 ground sector for g > 0', () => {
+    const psi = new Float32Array([1, 0, 0.9, 0, 0.2, 0, 0.1, 0])
+    for (let step = 0; step < 200; step++) {
+      applyWormholeCoupling(psi, [4], 0, 0.05, 1, true)
+      let n = 0
+      for (const v of psi) n += v * v
+      for (let i = 0; i < psi.length; i++) psi[i] = psi[i]! / Math.sqrt(n)
+    }
+    // Mirror pairs (0,3) and (1,2) end antisymmetric.
+    expect(psi[0]! + psi[6]!).toBeCloseTo(0, 5)
+    expect(psi[2]! + psi[4]!).toBeCloseTo(0, 5)
+  })
+})

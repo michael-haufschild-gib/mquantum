@@ -155,6 +155,21 @@ export interface TdseUniformStepStagingState {
   size: number
 }
 
+/**
+ * Axes that wrap periodically and therefore carry no PML: user-selected
+ * Kaluza-Klein compact dimensions plus metric-imposed periodic axes (e.g.
+ * sphere2D wraps φ on axis 2 even without a KK flag). Shared by the shader's
+ * compactDimsMask and the σ_max weakest-face selection.
+ *
+ * @param config - TDSE configuration
+ * @returns Bitmask, bit d set ⇔ axis d is periodic
+ */
+function tdsePeriodicDimsMask(config: TdseConfig): number {
+  const userCompactMask = buildCompactDimsMask(config.compactDims, config.latticeDim)
+  const metric = normalizeMetricForLattice(config.metric, config.latticeDim)
+  return userCompactMask | metricPeriodicDimsMask(metric.kind, config.latticeDim)
+}
+
 /** Create an empty per-step uniform staging state. */
 export function createTdseUniformStepStagingState(): TdseUniformStepStagingState {
   return { buffer: null, size: 0 }
@@ -282,7 +297,7 @@ export function packTdseUniformData(
   // Absorber + drive
   // absorberWidth is PML fraction; absorberStrength is σ_max computed from PML target reflection
   f32[I.absorberWidth] = config.absorberWidth
-  f32[I.absorberStrength] = sigmaMaxFromPmlConfig(config)
+  f32[I.absorberStrength] = sigmaMaxFromPmlConfig(config, undefined, tdsePeriodicDimsMask(config))
   u32[I.driveEnabled] = config.driveEnabled ? 1 : 0
   u32[I.driveWaveform] = WAVEFORM_MAP[config.driveWaveform] ?? 0
   f32[I.driveFrequency] = config.driveFrequency
@@ -388,10 +403,8 @@ export function packTdseUniformData(
   // metric-imposed compact axes both skip PML damping. Example: sphere2D
   // wraps φ (axis 2) even when the user did not toggle a generic
   // Kaluza-Klein compactification flag.
-  const userCompactMask = buildCompactDimsMask(config.compactDims, config.latticeDim)
+  u32[I.compactDimsMask] = tdsePeriodicDimsMask(config)
   const metric = normalizeMetricForLattice(config.metric, config.latticeDim)
-  const metricCompactMask = metricPeriodicDimsMask(metric.kind, config.latticeDim)
-  u32[I.compactDimsMask] = userCompactMask | metricCompactMask
 
   // Stochastic decoherence branching.
   // branchingEnabled is always written as 0 in the TDSE compute uniform.
@@ -430,8 +443,17 @@ export function packTdseUniformData(
   // the wormhole kernel. Default to (0, 0) → cos=1, sin=0 (no coupling).
   const wormholeG = clampFinite(config.wormholeCouplingG, 0, 0, 5)
   const wormholeTau = 0.5 * clampFinite(config.dt, 0, 0, Number.POSITIVE_INFINITY)
-  f32[I.wormholeCosTau] = Math.cos(wormholeTau * wormholeG)
-  f32[I.wormholeSinTau] = Math.sin(wormholeTau * wormholeG)
+  // Imaginary time (Wick rotation) turns exp(−i·τg·P_M) into
+  // exp(−τg·P_M) = cosh(τg)·I − sinh(τg)·P_M, like the potential's exp(−V·dτ):
+  // the same two slots carry (cosh, sinh) and the kernel drops the i. A
+  // unitary kick here left g·P_M out of the ground-state search.
+  const wormholeArg = wormholeTau * wormholeG
+  f32[I.wormholeCosTau] = config.imaginaryTimeEnabled
+    ? Math.cosh(wormholeArg)
+    : Math.cos(wormholeArg)
+  f32[I.wormholeSinTau] = config.imaginaryTimeEnabled
+    ? Math.sinh(wormholeArg)
+    : Math.sin(wormholeArg)
 
   // ER=EPR double-trace wormhole coupling.
   // Enabled + G + axis + pad. Axis defaults to 0 (x-axis reflection).

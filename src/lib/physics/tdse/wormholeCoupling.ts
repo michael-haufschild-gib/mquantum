@@ -157,13 +157,16 @@ function resolveMirrorSampleGeometry(
  * @param axis - Mirror axis index (`0 | 1 | 2`).
  * @param dt - Effective time step (Strang splitting contributes `0.5·dt` per dispatch).
  * @param g - Coupling strength (non-negative). `g=0` is a no-op.
+ * @param imaginaryTime - Wick-rotated step `exp(-dτ·g·P_M) = cosh·I − sinh·P_M`
+ *   (not norm-preserving; the imaginary-time loop renormalizes).
  */
 export function applyWormholeCoupling(
   psi: Float32Array,
   gridSize: readonly number[],
   axis: MirrorAxis,
   dt: number,
-  g: number
+  g: number,
+  imaginaryTime: boolean = false
 ): void {
   if (g === 0 || dt === 0) return
   const { strideA, Na, blockSize, totalSites } = decompose(gridSize, axis)
@@ -171,6 +174,10 @@ export function applyWormholeCoupling(
     throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
   }
   const halfTotal = totalSites / 2
+  if (imaginaryTime) {
+    applyWickRotatedCoupling(psi, strideA, Na, blockSize, halfTotal, dt * g)
+    return
+  }
   const c = Math.cos(dt * g)
   const s = Math.sin(dt * g)
   for (let tid = 0; tid < halfTotal; tid++) {
@@ -190,6 +197,33 @@ export function applyWormholeCoupling(
     psi[2 * idx + 1] = c * imV - s * reVP
     psi[2 * mirrorIdx] = c * reVP + s * imV
     psi[2 * mirrorIdx + 1] = c * imVP - s * reV
+  }
+}
+
+/** Imaginary-time mirror kick: ψ(v) ← cosh(x)ψ(v) − sinh(x)ψ(M(v)) on every pair. */
+function applyWickRotatedCoupling(
+  psi: Float32Array,
+  strideA: number,
+  Na: number,
+  blockSize: number,
+  halfTotal: number,
+  x: number
+): void {
+  const ch = Math.cosh(x)
+  const sh = Math.sinh(x)
+  for (let tid = 0; tid < halfTotal; tid++) {
+    const outer = Math.floor(tid / blockSize)
+    const withinBlock = tid - outer * blockSize
+    const coordA = Math.floor(withinBlock / strideA)
+    const innerOffset = withinBlock - coordA * strideA
+    const idx = outer * (strideA * Na) + coordA * strideA + innerOffset
+    const mirrorIdx = idx + (Na - 1 - 2 * coordA) * strideA
+    for (let part = 0; part < 2; part++) {
+      const a = psi[2 * idx + part]!
+      const b = psi[2 * mirrorIdx + part]!
+      psi[2 * idx + part] = ch * a - sh * b
+      psi[2 * mirrorIdx + part] = ch * b - sh * a
+    }
   }
 }
 
