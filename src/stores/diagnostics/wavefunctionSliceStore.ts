@@ -36,7 +36,7 @@ interface WavefunctionSliceState {
   sliceSourceMode: WavefunctionSliceSourceMode
   /** Number of grid points in the slice */
   sliceGridSize: number
-  /** World-space half-extent for coordinate mapping */
+  /** Lattice half-extent N·dx/2 of the slice axis (sample i ↦ −bound + (i + ½)·2·bound/N) */
   sliceWorldBound: number
   /** Whether slice data is available */
   hasData: boolean

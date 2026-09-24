@@ -446,18 +446,24 @@ const DataExportButtons: React.FC<{
           </Button>
         )}
 
-        {/* Wavefunction slice capture (dynamic modes) */}
-        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && !wfSliceHasData && (
+        {/* Wavefunction slice capture (dynamic modes). Stays available after a
+            capture: nothing resets the slice store, so hiding it once data
+            existed made a second (later-time) capture impossible. */}
+        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               useWavefunctionSliceStore.getState().requestCapture('x', quantumMode)
             }}
-            tooltip="Capture a wavefunction slice on the next frame"
+            tooltip={
+              wfSliceHasData
+                ? 'Capture a new wavefunction slice on the next frame (replaces the current one)'
+                : 'Capture a wavefunction slice on the next frame'
+            }
             data-testid="capture-slice"
           >
-            Capture |&psi;|&sup2; Slice
+            {wfSliceHasData ? 'Recapture' : 'Capture'} |&psi;|&sup2; Slice
           </Button>
         )}
         {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && wfSliceHasData && (

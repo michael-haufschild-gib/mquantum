@@ -479,6 +479,24 @@ describe('exportWavefunctionSliceCSV', () => {
     expect(lines).toHaveLength(4)
   })
 
+  // Regression: lattice slices were labelled with the endpoint formula over
+  // boundingRadius (1.15 margin); TDSE site i sits at (i − N/2 + ½)·dx.
+  it('labels a lattice slice with the cell-centred site positions', () => {
+    const dx = 0.5
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([0.1, 0.4, 0.4, 0.1]),
+      axis: 'x',
+      sourceMode: 'tdseDynamics',
+      gridSize: 4,
+      worldBound: (4 * dx) / 2,
+    })
+    const positions = exportWavefunctionSliceCSV('wavefunction', 'x')
+      .split('\n')
+      .slice(1)
+      .map((row) => Number(row.split(',')[0]))
+    expect(positions).toEqual([-0.75, -0.25, 0.25, 0.75].map((x) => expect.closeTo(x, 12)))
+  })
+
   it('does not export a captured wavefunction slice under the wrong axis label', () => {
     useWavefunctionSliceStore.getState().fulfillCapture({
       sliceData: new Float32Array([0.2, 0.8, 0.2]),

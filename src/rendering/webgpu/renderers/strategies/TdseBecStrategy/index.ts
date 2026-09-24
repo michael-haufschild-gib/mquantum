@@ -355,11 +355,21 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // instead of dropping the user's click.
     const sliceStore = useWavefunctionSliceStore.getState()
     if (sliceStore.captureRequested) {
+      // Lattice axes only, and the true half-extent N·dx/2 of the slice axis
+      // (boundingRadius carries the 1.15 render margin and the max over axes,
+      // so exported positions were stretched by ≥ 15%).
+      const latticeGrid = tdseConfig.gridSize.slice(0, tdseConfig.latticeDim)
+      const axisIdx = { x: 0, y: 1, z: 2 }[sliceStore.requestedAxis]
+      const axisSpacing = computeTdseEffectiveSpacing(tdseConfig)[axisIdx]
+      const halfExtent =
+        axisIdx < latticeGrid.length && axisSpacing !== undefined
+          ? (latticeGrid[axisIdx]! * axisSpacing) / 2
+          : shared.boundingRadius
       const scheduled = tdsePass.requestSliceCapture(
         ctx,
         sliceStore.requestedAxis,
-        tdseConfig.gridSize ?? [64],
-        shared.boundingRadius,
+        latticeGrid,
+        halfExtent,
         sliceStore.requestedSourceMode ?? quantumMode ?? null
       )
       if (scheduled) sliceStore.clearRequest()
