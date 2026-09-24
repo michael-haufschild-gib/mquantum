@@ -50,6 +50,8 @@ import { runVortexDetection, type VortexDetectState } from '../TDSEVortexDetect'
 export interface EvolutionFrameState {
   simTime: number
   stepAccumulator: number
+  /** Output: evolution steps actually executed this frame (0 on fractional-speed idle frames). */
+  stepsTaken?: number
 }
 
 /** Immutable resources needed by the evolution loop. */
@@ -196,6 +198,7 @@ export function runStrangEvolution(
     state.stepAccumulator += scaledSteps
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
+    state.stepsTaken = curvedSteps
     const curvedAbsorberActive = absorberEnabled
     const curvedPerStepRenorm = config.imaginaryTimeEnabled || stochasticActive
     // Per-step RK4 stage-time patch for time-dependent metrics (deSitter).
@@ -318,6 +321,7 @@ export function runStrangEvolution(
   state.stepAccumulator += scaledSteps
   const stepsThisFrame = Math.floor(state.stepAccumulator)
   state.stepAccumulator -= stepsThisFrame
+  state.stepsTaken = stepsThisFrame
 
   // Pre-compute stochastic uniforms for all steps (staging buffer pattern).
   // Must happen before the loop so each step gets independent random data.

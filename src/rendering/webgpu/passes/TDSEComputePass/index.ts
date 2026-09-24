@@ -1236,6 +1236,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.uniformBuffer,
         this.psiBuffer,
         linearWG,
+        evoState.stepsTaken ?? 0,
         this.dc
       )
     }

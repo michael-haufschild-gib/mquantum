@@ -5,11 +5,14 @@
  * TDSEComputePassDisorder: owns its pipeline + bind group, exposes
  * build/dispatch/dispose helpers that the main pass calls.
  *
- * Pipeline binds {uniforms, psi (vec2f)} and perturbs ψ by a
- * horizon-localized stochastic phase kick each time it is dispatched.
- * Intended frequency: once per frame (after the full Strang evolution loop)
- * for the `blackHoleAnalog` BEC preset. Dispatch is gated on
- * `hawkingPairInjection && quantumMode === 'becDynamics'` by the caller.
+ * Pipeline binds {uniforms, psi (vec2f), psiPrev snapshot, kick scale} and
+ * perturbs ψ by a horizon-localized stochastic phase kick each time it is
+ * dispatched. Intended frequency: at most once per frame (after the full
+ * Strang evolution loop) for the `blackHoleAnalog` BEC preset, skipped on
+ * frames that advanced no step and scaled by √(stepsTaken / stepsPerFrame)
+ * so playback speed does not change the injected noise per simulated step.
+ * Dispatch is gated on `hawkingPairInjection && quantumMode === 'becDynamics'`
+ * by the caller.
  *
  * @module rendering/webgpu/passes/TDSEComputePassHawking
  */
@@ -29,6 +32,14 @@ export interface HawkingInjectState {
   bg: GPUBindGroup | null
   lastUniformBuffer: GPUBuffer | null
   lastPsi: GPUBuffer | null
+  /**
+   * Pre-dispatch copy of ψ. The kernel's central-difference stencil reads
+   * neighbours from here so no invocation observes a neighbour another
+   * workgroup already rotated in the same dispatch. Owned by this state.
+   */
+  psiSnapshot: GPUBuffer | null
+  /** 16-byte uniform: x = √(stepsTaken / stepsPerFrame) kick scale. Owned. */
+  kickParams: GPUBuffer | null
   /** Deterministic noise-evolution step counter (u32-wrapping). */
   stepIndex: number
 }
@@ -41,9 +52,15 @@ export function createHawkingInjectState(): HawkingInjectState {
     bg: null,
     lastUniformBuffer: null,
     lastPsi: null,
+    psiSnapshot: null,
+    kickParams: null,
     stepIndex: 0,
   }
 }
+
+/** Byte size of the kick-parameter uniform (one vec4f). */
+const KICK_PARAMS_BYTES = 16
+const kickParamsScratch = new Float32Array(4)
 
 /**
  * Build the injection compute pipeline. Idempotent — safe to call on every
@@ -68,7 +85,12 @@ export function buildHawkingInjectPipeline(
   if (state.pipeline) return
   // Binding 0 (TDSEUniforms) is `read-only-storage` — see tdseInit.wgsl.ts /
   // TDSEComputePassSetup init BGL comment for the spec-noncompliance rationale.
-  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', ['read-only-storage', 'storage'])
+  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', [
+    'read-only-storage',
+    'storage',
+    'read-only-storage',
+    'uniform',
+  ])
   const sm = createShaderModule(device, composeBecHawkingInjectShader(), 'bec-hawking-inject')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'bec-hawking-inject')
 }
@@ -80,6 +102,30 @@ export function buildHawkingInjectPipeline(
  */
 export function composeBecHawkingInjectShader(): string {
   return tdseUniformsBlock + freeScalarNDIndexBlock + becHawkingInjectBlock
+}
+
+/**
+ * Allocate (or resize) the owned ψ snapshot and kick-parameter buffers. A
+ * resized snapshot invalidates the cached bind group.
+ */
+function ensureHawkingScratch(device: GPUDevice, state: HawkingInjectState, psi: GPUBuffer): void {
+  if (!state.psiSnapshot || state.psiSnapshot.size !== psi.size) {
+    state.psiSnapshot?.destroy()
+    state.psiSnapshot = device.createBuffer({
+      label: 'bec-hawking-psi-snapshot',
+      size: psi.size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    })
+    state.bg = null
+  }
+  if (!state.kickParams) {
+    state.kickParams = device.createBuffer({
+      label: 'bec-hawking-kick-params',
+      size: KICK_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+    state.bg = null
+  }
 }
 
 /**
@@ -95,13 +141,15 @@ function ensureHawkingBindGroup(
   if (state.bg && state.lastUniformBuffer === uniformBuffer && state.lastPsi === psi) {
     return
   }
-  if (!state.bgl) return
+  if (!state.bgl || !state.psiSnapshot || !state.kickParams) return
   state.bg = device.createBindGroup({
     label: 'bec-hawking-inject-bg',
     layout: state.bgl,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
       { binding: 1, resource: { buffer: psi } },
+      { binding: 2, resource: { buffer: state.psiSnapshot } },
+      { binding: 3, resource: { buffer: state.kickParams } },
     ],
   })
   state.lastUniformBuffer = uniformBuffer
@@ -109,9 +157,28 @@ function ensureHawkingBindGroup(
 }
 
 /**
+ * Kick-amplitude scale for a frame that advanced `stepsTaken` evolution
+ * steps: √(stepsTaken / stepsPerFrame). The per-frame kick has variance
+ * ∝ rate², so this keeps the injected phase variance per simulated step at
+ * rate² / stepsPerFrame whatever the playback speed; a speed-1 frame
+ * (stepsTaken = stepsPerFrame) returns exactly 1. Returns 0 when no step ran
+ * or the inputs are unusable, which suppresses the dispatch.
+ *
+ * @param stepsTaken - Evolution steps executed this frame
+ * @param stepsPerFrame - Nominal steps per frame at speed 1
+ * @returns Amplitude scale ≥ 0
+ */
+export function hawkingKickScale(stepsTaken: number, stepsPerFrame: number): number {
+  if (!Number.isInteger(stepsTaken) || stepsTaken <= 0) return 0
+  if (!Number.isFinite(stepsPerFrame) || stepsPerFrame <= 0) return 0
+  return Math.sqrt(stepsTaken / stepsPerFrame)
+}
+
+/**
  * Dispatch the injection pipeline if enabled. No-ops when:
  *   - `hawkingPairInjection` is false,
  *   - `hawkingInjectRate` is non-finite or non-positive,
+ *   - the frame advanced no evolution step (see {@link hawkingKickScale}),
  *   - dispatch workgroup count is invalid,
  *   - pipeline or any buffer is null.
  *
@@ -124,6 +191,7 @@ function ensureHawkingBindGroup(
  * @param uniformBuffer - TDSEUniforms buffer (must be fully written this frame)
  * @param psi - Merged ψ buffer (array<vec2f>, read/write)
  * @param linearWG - Dispatch count (ceil(totalSites / 64))
+ * @param stepsTaken - Evolution steps executed this frame
  * @param dispatchCompute - Pass's dispatch helper
  */
 export function maybeDispatchHawkingInject(
@@ -134,6 +202,7 @@ export function maybeDispatchHawkingInject(
   uniformBuffer: GPUBuffer | null,
   psi: GPUBuffer | null,
   linearWG: number,
+  stepsTaken: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
@@ -150,10 +219,18 @@ export function maybeDispatchHawkingInject(
   // dispatchWorkgroups takes GPUSize32 (u32). Reject NaN/Infinity and any
   // non-integer count — fractional values trigger GPUValidationError at dispatch.
   if (!Number.isInteger(linearWG) || linearWG <= 0 || linearWG > 0xffffffff) return false
+  const kickScale = hawkingKickScale(stepsTaken, config.stepsPerFrame)
+  if (kickScale <= 0) return false
   if (!state.pipeline || !uniformBuffer || !psi) return false
 
+  ensureHawkingScratch(device, state, psi)
   ensureHawkingBindGroup(device, state, uniformBuffer, psi)
-  if (!state.bg) return false
+  if (!state.bg || !state.psiSnapshot || !state.kickParams) return false
+
+  // One dispatch per frame, so a queue write is ordered correctly here.
+  kickParamsScratch[0] = kickScale
+  device.queue.writeBuffer(state.kickParams, 0, kickParamsScratch)
+  ctx.encoder.copyBufferToBuffer(psi, 0, state.psiSnapshot, 0, psi.size)
 
   const pass = ctx.beginComputePass({ label: 'bec-hawking-inject' })
   dispatchCompute(pass, state.pipeline, [state.bg], linearWG)
@@ -174,6 +251,7 @@ export function maybeDispatchHawkingInject(
  * @param uniformBuffer - TDSEUniforms buffer
  * @param psi - Merged ψ buffer (array<vec2f>)
  * @param linearWG - Dispatch count (ceil(totalSites / 64))
+ * @param stepsTaken - Evolution steps executed this frame
  * @param dispatchCompute - Pass's dispatch helper
  */
 export function runHawkingFrame(
@@ -184,6 +262,7 @@ export function runHawkingFrame(
   uniformBuffer: GPUBuffer | null,
   psi: GPUBuffer | null,
   linearWG: number,
+  stepsTaken: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
@@ -199,6 +278,7 @@ export function runHawkingFrame(
     uniformBuffer,
     psi,
     linearWG,
+    stepsTaken,
     dispatchCompute
   )
   // Advance noise counter after dispatch so next frame's uniform-write sees
@@ -208,8 +288,15 @@ export function runHawkingFrame(
   }
 }
 
-/** Drop references. GPU buffers are owned by the main pass — do not destroy. */
+/**
+ * Drop references. The uniform and ψ buffers are owned by the main pass and
+ * are not destroyed; the snapshot and kick-parameter buffers are owned here.
+ */
 export function disposeHawkingInject(state: HawkingInjectState): void {
+  state.psiSnapshot?.destroy()
+  state.psiSnapshot = null
+  state.kickParams?.destroy()
+  state.kickParams = null
   state.pipeline = null
   state.bgl = null
   state.bg = null
