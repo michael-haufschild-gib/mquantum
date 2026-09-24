@@ -36,10 +36,10 @@ export interface WdwPulseAlphaScratch {
   sampleKey?: string
   a0?: Uint16Array
   a1?: Uint16Array
-  aw?: Float32Array
+  aw?: Float64Array
   p0?: Uint16Array
   p1?: Uint16Array
-  pw?: Float32Array
+  pw?: Float64Array
   dirtyRowMarks?: Uint8Array
   currentRowMarks?: Uint8Array
   dirtyRows?: number[]
@@ -50,10 +50,10 @@ export interface WdwPulseAlphaScratch {
 interface PulseSampleTables {
   a0: Uint16Array
   a1: Uint16Array
-  aw: Float32Array
+  aw: Float64Array
   p0: Uint16Array
   p1: Uint16Array
-  pw: Float32Array
+  pw: Float64Array
 }
 
 function fillPulseAxisTables(
@@ -61,7 +61,7 @@ function fillPulseAxisTables(
   targetLen: number,
   out0: Uint16Array,
   out1: Uint16Array,
-  outW: Float32Array
+  outW: Float64Array
 ): void {
   const scale = len > 1 ? len - 1 : 0
   for (let i = 0; i < targetLen; i++) {
@@ -93,10 +93,13 @@ function ensurePulseSampleTables(
     scratch.sampleKey = key
     scratch.a0 = new Uint16Array(targetGridSize)
     scratch.a1 = new Uint16Array(targetGridSize)
-    scratch.aw = new Float32Array(targetGridSize)
+    // Float64 weights: the legacy single-call pack computes them in f64, and
+    // f32-rounded weights flipped the last half-float bit of A on some voxels,
+    // breaking the byte-for-byte baseline + tick ≡ legacy invariant.
+    scratch.aw = new Float64Array(targetGridSize)
     scratch.p0 = new Uint16Array(targetGridSize)
     scratch.p1 = new Uint16Array(targetGridSize)
-    scratch.pw = new Float32Array(targetGridSize)
+    scratch.pw = new Float64Array(targetGridSize)
     fillPulseAxisTables(Na, targetGridSize, scratch.a0, scratch.a1, scratch.aw)
     fillPulseAxisTables(Nphi, targetGridSize, scratch.p0, scratch.p1, scratch.pw)
   }

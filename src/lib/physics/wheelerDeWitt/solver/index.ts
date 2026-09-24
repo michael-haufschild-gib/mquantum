@@ -209,9 +209,11 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   const dphi = (2 * phiExtent) / (Nphi - 1)
   const invDphi2 = 1 / (dphi * dphi)
 
-  // Explicit-leapfrog CFL diagnostic for the φ-Laplacian term:
+  // CFL number of the φ-Laplacian term:
   //   da² · max(1/a²) · 8/dphi²   (max(1/a²) attained at aMin).
-  // > WDW_CFL_BUDGET flags marginal stability. Dev-only and rate-limited
+  // The Crank–Nicolson bulk is unconditionally stable, so > WDW_CFL_BUDGET
+  // is an ACCURACY hint (high-k φ dispersion), not a stability flag (the
+  // store default grid sits at ≈ 3.0). Dev-only and rate-limited
   // through WDW_CFL_WARN_BUDGET.remaining so it never spams the console
   // during interactive parameter sweeps; reset the budget via
   // {@link resetCflWarningBudget} in tests.
@@ -220,8 +222,9 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     if (cflPhi > WDW_CFL_BUDGET) {
       WDW_CFL_WARN_BUDGET.remaining -= 1
       logger.warn(
-        `[wdw] CFL margin tight: da²·(1/aMin²)·8/dphi² = ${cflPhi.toFixed(2)} (budget ${WDW_CFL_BUDGET}). ` +
-          `Recommend aMin ≥ 0.1, gridNphi ≤ 48, gridNa ≤ 256, phiExtent ≥ 2.0. ` +
+        `[wdw] High φ-Laplacian CFL number da²·(1/aMin²)·8/dphi² = ${cflPhi.toFixed(2)} ` +
+          `(> ${WDW_CFL_BUDGET}): the Crank–Nicolson bulk stays stable but high-k φ modes ` +
+          `lose accuracy. Lower it by raising gridNa, aMin or phiExtent, or lowering gridNphi. ` +
           `Current: aMin=${aMin}, aMax=${aMax}, gridNa=${gridNa}, gridNphi=${gridNphi}, phiExtent=${phiExtent}.`
       )
     }
