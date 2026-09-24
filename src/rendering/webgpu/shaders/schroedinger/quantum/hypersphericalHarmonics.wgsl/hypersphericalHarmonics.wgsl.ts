@@ -204,11 +204,15 @@ fn cartesianToHyperspherical${D}D(xND: array<f32, 11>) -> HypersphericalCoords {
  * N = sqrt( (2l_k + 2α) × Γ(n_k + 1) × Γ(n_k + 2α) / (Γ(l_k + α + 1) × Γ(l_k + α)) )
  *   ... simplified using the relation for Gegenbauer normalization.
  *
- * For unit-normalized hyperspherical harmonics, the per-layer normalization is:
- *   N_k = sqrt( (2l_k + D-k-1) × (l_k - l_{k+1})! × Γ(l_{k+1} + (D-k-1)/2) /
- *               (2π × Γ(l_k + (D-k+1)/2)) )
+ * For unit-normalized hyperspherical harmonics, with n = l_k − l_{k+1} and
+ * α = l_{k+1} + (D−k−2)/2 (0-based k), the per-layer normalization is:
+ *   N_k² = n! (n+α) Γ(α)² 2^{2α−1} / (π Γ(n+2α))
+ * — the inverse of the Gegenbauer orthogonality integral
+ *   ∫₀^π [C_n^α(cos θ)]² sin^{2α}(θ) dθ.
  *
- * We compute this in log-space for numerical stability.
+ * We compute this in log-space for numerical stability. The renderer reads
+ * the CPU-packed value (`getCoupledLayerNorm`); this WGSL copy mirrors
+ * `computeHypersphericalLayerNorm` in uniformPackingHydrogenMath.
  */
 export const hypersphericalNormBlock = /* wgsl */ `
 // ============================================
@@ -227,27 +231,21 @@ fn lnHypersphericalLayerNorm(lk: i32, lkp1: i32, D: i32, k: i32) -> f32 {
   // alpha = l_{k+1} + (D - k - 2) / 2
   // For the normalization integral of C_n^alpha(cos theta) * sin^{2*alpha}(theta):
   // ∫_0^pi |C_n^alpha(cos t)|^2 sin^{2alpha}(t) dt = pi * 2^{1-2alpha} * Gamma(n+2alpha) / (n! * (n+alpha) * Gamma(alpha)^2)
+  // so N_k^2 = n! * (n+alpha) * Gamma(alpha)^2 * 2^{2alpha-1} / (pi * Gamma(n+2alpha)).
   //
-  // Simplified normalization (Dong 2011, Part I; Avery 1989):
-  // N_k^2 = (2*lk + D - k - 1) * nk! * Gamma(lkp1 + (D-k-1)/2) / (2 * Gamma(lk + (D-k+1)/2))
-  //
-  // Using half-integer gamma LUT:
-  let dMinusKMinus1 = D - k - 1; // this is always >= 2 for valid k
-  let prefactor = f32(2 * lk + dMinusKMinus1);
+  // twoAlpha is an integer >= 2 for valid k, so Gamma(alpha) is a half-integer
+  // LUT entry and Gamma(n+2alpha) = (n+2alpha-1)!.
+  let twoAlpha = 2 * lkp1 + D - k - 2;
 
-  // nk! via lnFactorial (already available from hydrogen radial)
+  // nk! and (n+2alpha-1)! via lnFactorial (already available from hydrogen radial)
   let lnNkFact = lnFactorial(nk);
+  let lnGammaNPlus2Alpha = lnFactorial(nk + twoAlpha - 1);
+  let lnGammaAlpha = lnGammaHalf(twoAlpha);
+  let nPlusAlpha = 0.5 * f32(2 * nk + twoAlpha);
 
-  // Gamma(lkp1 + (D-k-1)/2): argument = (2*lkp1 + D - k - 1) / 2
-  let gammaArgNum = 2 * lkp1 + dMinusKMinus1;
-  let lnGammaNum = lnGammaHalf(gammaArgNum);
-
-  // Gamma(lk + (D-k+1)/2): argument = (2*lk + D - k + 1) / 2
-  let gammaArgDen = 2 * lk + dMinusKMinus1 + 2;
-  let lnGammaDen = lnGammaHalf(gammaArgDen);
-
-  // ln(N_k^2) = ln(prefactor) + lnNkFact + lnGammaNum - ln(2) - lnGammaDen
-  let lnNormSq = log(max(prefactor, 1e-20)) + lnNkFact + lnGammaNum - 0.6931472 - lnGammaDen;
+  // ln(N_k^2) = ln n! + ln(n+alpha) + 2 ln Gamma(alpha) + (2alpha-1) ln 2 - ln pi - ln Gamma(n+2alpha)
+  let lnNormSq = lnNkFact + log(max(nPlusAlpha, 1e-20)) + 2.0 * lnGammaAlpha
+    + f32(twoAlpha - 1) * 0.6931472 - 1.1447299 - lnGammaNPlus2Alpha;
 
   return 0.5 * lnNormSq;
 }
