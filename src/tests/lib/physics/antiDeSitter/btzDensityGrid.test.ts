@@ -279,3 +279,41 @@ describe('packAntiDeSitterDensityGrid (d=3 S¹ angular regression)', () => {
     expect(xPos).toBeGreaterThan(yPos + 0.05)
   })
 })
+
+describe('AdS CPU packers — G channel is log of the packed R', () => {
+  // Regression: BTZ / HKLL wrote log(raw amplitude) (≈ 6 at raw peaks of
+  // ~400–1000) next to a peak-normalized R. Every density-keyed color ramp
+  // and the emission glow map s via (s + 8)/8, so the whole visible field was
+  // pinned at the top of the palette.
+  const cases: Array<[string, AntiDeSitterConfig]> = [
+    ['BTZ', btzConfig()],
+    [
+      'HKLL',
+      {
+        ...DEFAULT_ANTI_DE_SITTER_CONFIG,
+        d: 4,
+        btzEnabled: false,
+        hkllEnabled: true,
+        hkllBoundarySource: 'eigenstate',
+      },
+    ],
+  ]
+  for (const [label, cfg] of cases) {
+    it(`${label}: G = log(R) and never exceeds 0`, () => {
+      const packed = packAntiDeSitterDensityGrid(cfg, undefined, 32)
+      let checked = 0
+      let maxG = -Infinity
+      for (let i = 0; i < packed.density.length / 4; i++) {
+        const r = halfToFloat(packed.density[i * 4]!)
+        const g = halfToFloat(packed.density[i * 4 + 1]!)
+        maxG = Math.max(maxG, g)
+        if (r > 1e-3) {
+          expect(g).toBeCloseTo(Math.log(r), 2)
+          checked++
+        }
+      }
+      expect(checked).toBeGreaterThan(0)
+      expect(maxG).toBeLessThanOrEqual(1e-3)
+    })
+  }
+})

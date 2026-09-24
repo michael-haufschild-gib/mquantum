@@ -358,7 +358,9 @@ export function packAntiDeSitterDensityGrid(
   for (let i = 0; i < total; i++) {
     const rho2 = bulk[i]!
     const r = clamp01(rho2 * peakNorm)
-    const logRho = Math.log(rho2 + 1e-10)
+    // G = log of the packed (peak-normalized) R, the invariant every other
+    // density grid keeps (color ramps map s ∈ [−8, 0] via (s + 8)/8).
+    const logRho = Math.log(r + 1e-10)
     // ψ is real at t=0 → phase is 0 (ψ ≥ 0) or π (ψ < 0). atan2(0, re) was
     // a per-voxel ~60 ns call; the sign check is ~1 ns.
     const phase = reField[i]! < 0 ? Math.PI : 0
@@ -532,7 +534,10 @@ export function packBtzThermalDensityGrid(
       continue
     }
     const r = Math.min(amp * peakNorm, 1)
-    const logRho = Math.log(amp + 1e-10)
+    // log of the packed R, not of the raw amplitude: the raw BTZ amplitude
+    // reaches ~500 (horizon marker 1000), so log(amp) ≈ 6 pinned every
+    // density-keyed color ramp and the emission glow at their maximum.
+    const logRho = Math.log(r + 1e-10)
     // Encode horizon marker into the phase channel so the color palette
     // paints horizon voxels with a distinct tone. Value chosen so the
     // cosine-palette lookup lands on a near-black phase colour.
@@ -701,7 +706,9 @@ export function packHkllReconstructedDensityGrid(
         const rho2 = re * re + im * im
 
         const r = clamp01(rho2 * peakNorm)
-        const logRho = Math.log(rho2 + 1e-10)
+        // log of the packed R (raw HKLL peaks reach ~400 → log ≈ 6 saturated
+        // the (s + 8)/8 color window everywhere the field is visible).
+        const logRho = Math.log(r + 1e-10)
         const phase = Math.atan2(im, re)
         packRGBA16F(density, outIdx, r, logRho, phase, 0)
       }
