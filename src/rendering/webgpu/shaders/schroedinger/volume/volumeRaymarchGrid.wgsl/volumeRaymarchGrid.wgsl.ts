@@ -66,7 +66,15 @@ fn volumeRaymarchGrid(
   // Sample count scaled by per-pixel path length to keep step SIZE constant
   let safeBoundingRadius = max(abs(uniforms.boundingRadius), 1e-4);
   let maxPathLen = 2.0 * safeBoundingRadius;
-  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
+  // Clamp to the loop cap BEFORE sizing the step: compute modes
+  // (IS_FREE_SCALAR = density-grid compute flag) intersect a box with paths
+  // up to 2√3·R, so an uncapped count (e.g. 96·√3 ≈ 166 > 128)
+  // left stepLen sized for samples the loop never takes and the back of the
+  // lattice unsampled along view diagonals.
+  let sampleCount = min(
+    max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4),
+    MAX_VOLUME_SAMPLES
+  );
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
 
