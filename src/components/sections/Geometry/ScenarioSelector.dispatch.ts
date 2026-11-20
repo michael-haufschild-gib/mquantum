@@ -15,6 +15,7 @@ import type { BifurcationHorizonPresetName } from '@/lib/geometry/extended/bifur
 import type { CoherenceHorizonPresetName } from '@/lib/geometry/extended/coherenceHorizon'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import type { HilbertPolyaPresetName } from '@/lib/geometry/extended/hilbertPolya'
+import type { HorizonPreset } from '@/lib/geometry/extended/modularHorizon'
 import type { ModularKnotPresetName } from '@/lib/geometry/extended/modularKnot'
 import type { PauliConfig } from '@/lib/geometry/extended/pauli'
 import type { RiemannZetaPresetName } from '@/lib/geometry/extended/riemannZeta'
@@ -48,6 +49,7 @@ export interface ScenarioDispatchActions {
   setHilbertPolyaPreset: (name: HilbertPolyaPresetName) => void
   setBifurcationHorizonPreset: (name: BifurcationHorizonPresetName) => void
   setModularKnotPreset: (name: ModularKnotPresetName) => void
+  setModularHorizonPreset: (name: HorizonPreset) => void
   setWdwZetaPreset: (mode: WdwZetaModeKey, name: string) => void
   setBellPairConfig: (config: Partial<BellPairConfig>) => void
 }
@@ -60,6 +62,7 @@ type TaggedPresetMode =
   | 'hilbertPolya'
   | 'bifurcationHorizon'
   | 'modularKnot'
+  | 'modularHorizon'
 
 /** Apply a Pauli preset by ID, setting config and color algorithm. */
 function applyPauliPresetById(presetId: string, a: ScenarioDispatchActions): void {
@@ -99,6 +102,9 @@ function dispatchTaggedPreset(
     case 'bifurcationHorizon':
       a.setBifurcationHorizonPreset(value as BifurcationHorizonPresetName)
       break
+    case 'modularHorizon':
+      a.setModularHorizonPreset(value as HorizonPreset)
+      break
     case 'modularKnot':
       a.setModularKnotPreset(value as ModularKnotPresetName)
       break
@@ -122,6 +128,7 @@ const TAGGED_PRESET_MODES = new Set<string>([
   'hilbertPolya',
   'bifurcationHorizon',
   'modularKnot',
+  'modularHorizon',
 ])
 
 /**

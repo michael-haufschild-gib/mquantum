@@ -53,7 +53,7 @@ export interface AnimationState {
   clearAllPlanes: () => void
   stopAll: () => void
   setDimension: (dimension: number) => void
-  updateAccumulatedTime: (delta: number) => void
+  updateAccumulatedTime: (delta: number, minimum?: number) => void
   reset: () => void
 
   /** Calculate the rotation delta for a given time delta */
@@ -221,7 +221,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
     })
   },
 
-  updateAccumulatedTime: (delta: number) => {
+  updateAccumulatedTime: (delta: number, minimum = -Infinity) => {
     if (!Number.isFinite(delta)) {
       logger.warn(`[animationStore] Ignoring non-finite accumulated-time delta: ${delta}`)
       return
@@ -230,7 +230,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
     const { isPlaying, speed, direction } = get()
     if (isPlaying) {
       set((state) => ({
-        accumulatedTime: state.accumulatedTime + delta * speed * direction,
+        accumulatedTime: Math.max(minimum, state.accumulatedTime + delta * speed * direction),
       }))
     }
   },

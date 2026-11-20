@@ -33,6 +33,7 @@ import type { FreeScalarConfig } from './freeScalar'
 import { DEFAULT_FREE_SCALAR_CONFIG } from './freeScalar'
 import type { HilbertPolyaConfig } from './hilbertPolya'
 import { DEFAULT_HILBERT_POLYA_CONFIG } from './hilbertPolya'
+import { horizonPreset, type ModularHorizonConfig } from './modularHorizon'
 import type { ModularKnotConfig } from './modularKnot'
 import { DEFAULT_MODULAR_KNOT_CONFIG } from './modularKnot'
 import type { QuantumWalkConfig } from './quantumWalk'
@@ -134,10 +135,7 @@ export type SchroedingerCrossSectionAxis = 'x' | 'y' | 'z'
  * Probability current visualization style.
  */
 export type SchroedingerProbabilityCurrentStyle =
-  | 'magnitude'
-  | 'arrows'
-  | 'surfaceLIC'
-  | 'streamlines'
+  'magnitude' | 'arrows' | 'surfaceLIC' | 'streamlines'
 
 /**
  * Placement mode for probability current overlays.
@@ -682,6 +680,7 @@ export interface SchroedingerConfig
   // === Modular Knot Configuration (when quantumMode === 'modularKnot') ===
   /** Modular geodesics knotted around the trefoil, colored by Rademacher Φ. */
   modularKnot: ModularKnotConfig
+  modularHorizon: ModularHorizonConfig
 
   // === WDW ⊗ ζ suite configs (one per suite mode) ===
   /** The Constraint Seam — completed ξ folded about Re s=½, zeros pinned. */
@@ -985,6 +984,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   hilbertPolya: DEFAULT_HILBERT_POLYA_CONFIG,
   bifurcationHorizon: DEFAULT_BIFURCATION_HORIZON_CONFIG,
   modularKnot: DEFAULT_MODULAR_KNOT_CONFIG,
+  modularHorizon: horizonPreset('silentReturn'),
   constraintSeam: DEFAULT_CONSTRAINT_SEAM_CONFIG,
   moebiusNoBoundary: DEFAULT_MOEBIUS_NO_BOUNDARY_CONFIG,
   forcedCell: DEFAULT_FORCED_CELL_CONFIG,

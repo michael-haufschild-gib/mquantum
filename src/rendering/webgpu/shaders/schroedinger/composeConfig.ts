@@ -38,6 +38,7 @@ import { generateMainBlockWdwZetaVolume } from './mainWdwZetaVolume.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { NODAL_DEFINITION_MAP, NODAL_FAMILY_MAP, NODAL_RENDER_MODE_MAP } from './temporalJitter'
 import { ALGO_BRANCH } from './volume/emission.wgsl/emission.wgsl'
+import { modularHorizonBlock } from './volume/mainModularHorizon.wgsl'
 
 /** Quantum physics mode for Schrödinger visualization */
 export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
@@ -195,6 +196,7 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
    * like the other horizon modes. Leave `false` for every other mode.
    */
   isModularKnot?: boolean
+  isModularHorizon?: boolean
   /**
    * WDW ⊗ ζ suite mode (any of the ten `WDW_ZETA_MODES`). All ten share this one
    * flag, the dedicated 3D-texture volumetric main block (`mainWdwZetaVolume`),
@@ -320,7 +322,7 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
     min: isWigner ? 3 : 2,
     fallback: 3,
   })
-  const is2D = actualDim === 2 || isWigner
+  const is2D = (actualDim === 2 && !config.isModularHorizon) || isWigner
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
   const includeHydrogen = isHydrogenFamily
@@ -403,6 +405,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   isHilbertPolya?: boolean
   isBifurcationHorizon?: boolean
   isModularKnot?: boolean
+  isModularHorizon?: boolean
   isWdwZetaVolume?: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean
@@ -691,8 +694,10 @@ export function selectMainBlock(
   useDensityGrid: boolean,
   useDensityMatrix: boolean,
   useWignerCache: boolean,
-  gridOnly: boolean
+  gridOnly: boolean,
+  horizonColor?: number
 ): string {
+  if (horizonColor !== undefined) return modularHorizonBlock(horizonColor)
   if (isCoherenceHorizon) return generateMainBlockCoherenceHorizon()
   if (isRiemannZeta) return generateMainBlockRiemannZeta()
   if (isHilbertPolya) return generateMainBlockHilbertPolya()

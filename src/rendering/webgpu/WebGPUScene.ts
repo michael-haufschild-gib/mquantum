@@ -342,6 +342,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // and 2D pipelines (fullscreen triangle, no depth/MRT). Derive the
       // compute-mode set from the registry so new compute modes (e.g.
       // wheelerDeWitt) are gated automatically without editing this list.
+      (objectType === 'schroedinger' && schroedingerCompile.quantumMode === 'modularHorizon') ||
       isComputeQuantumType(schroedingerCompile.quantumMode) ||
       objectType === 'pauliSpinor' ||
       dimension === 2 ||

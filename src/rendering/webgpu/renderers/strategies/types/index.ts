@@ -228,6 +228,7 @@ export interface ModeFrameContext {
   device: GPUDevice
   rendererConfig: SchrodingerRendererConfig
   schroedingerUniformData: ArrayBuffer
+  cameraUniformData?: Float32Array
   basisUniformData: Float32Array
   schroedingerFloatView: Float32Array
   schroedingerIntView: Int32Array

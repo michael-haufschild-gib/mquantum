@@ -14,6 +14,7 @@ import {
   createDefaultBellPairConfig,
   sanitizeBellPairConfig,
 } from '@/lib/geometry/extended/bellPair'
+import { validHorizon } from '@/lib/geometry/extended/modularHorizon'
 import { createDefaultPauliConfig, type PauliConfig } from '@/lib/geometry/extended/pauli'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
@@ -429,6 +430,9 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   normalized = normalizeTdseLoadedFieldsForMerge(normalized)
   normalized = normalizeTdseEnums(normalized)
   normalized = normalizeBecLoadedConfig(normalized)
+  normalized = { ...normalized, modularHorizon: validHorizon(normalized.modularHorizon) }
+  if (normalized.quantumMode === 'modularHorizon')
+    normalized = { ...normalized, representation: 'position', isoEnabled: false }
   normalized = normalizeAntiDeSitterLoadedConfig(normalized)
   normalized = normalizeWheelerDeWittConfig(normalized)
   normalized = {

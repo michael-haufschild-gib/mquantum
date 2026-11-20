@@ -193,3 +193,18 @@ export function applyWdwZetaParams(urlState: ParsedShareableState, ext: Extended
     ext.setWdwZetaField(mode, key, value)
   }
 }
+
+/** Apply the active horizon mode’s URL overrides after mode selection. */
+export function applySpectralHorizonParams(
+  effectiveQuantumMode: ParsedShareableState['quantumMode'],
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
+  if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
+  if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
+  if (effectiveQuantumMode === 'bifurcationHorizon') applyBifurcationHorizonParams(urlState, ext)
+  if (effectiveQuantumMode === 'modularHorizon' && urlState.modularHorizon)
+    ext.setModularHorizonConfig(urlState.modularHorizon)
+  if (effectiveQuantumMode === 'modularKnot') applyModularKnotParams(urlState, ext)
+}

@@ -22,6 +22,7 @@ import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing
 
 import type { WebGPURenderContext } from '../../core/types'
 import { advanceTemporalBayerCycle } from '../../shaders/schroedinger/temporalJitter'
+import { isPipeline2D } from '../rendererConfigUtils'
 import {
   type AnimationState,
   type AppearanceStoreState,
@@ -137,7 +138,7 @@ export function computeCameraUpdate(
 
   const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
   const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-  const is2D = (config.dimension ?? 3) === 2 || config.representation === 'wigner'
+  const is2D = isPipeline2D(config)
 
   // Pack the phase used by this draw, then advance state for the next frame.
   // WebGPUTemporalCloudPass follows the same use-then-advance contract; changing
@@ -463,8 +464,8 @@ export function computeSchroedingerUpdate(
     effectiveMomentumScale
   )
 
-  // Canonical compensation
-  if (strategy.isComputeMode) {
+  // The cusp atlas already has unit-norm angular modes; its radial gain is explicit.
+  if (strategy.isComputeMode || inputs.quantumModeStr === 'modularHorizon') {
     state.canonicalDensityCompensation = 1.0
     state.cachedPeakDensity = 1.0
   } else if (state.cachedPreset) {

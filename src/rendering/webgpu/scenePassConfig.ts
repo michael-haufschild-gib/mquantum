@@ -308,7 +308,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
   const isBellPair = config.objectType === 'bellPair'
   const isCompute = isComputeQuantumType(config.quantumMode) || isPauli || isBellPair
   const is2D = !isCompute && (config.dimension === 2 || config.representation === 'wigner')
-  const disableAnalytical = isCompute || is2D
+  const disableAnalytical = isCompute || is2D || config.quantumMode === 'modularHorizon'
   const disableQuantumEffect = isCompute || config.openQuantumEnabled
 
   // Clamp dimension to the mode's minimum from the quantum type registry.

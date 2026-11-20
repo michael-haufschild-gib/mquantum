@@ -19,11 +19,12 @@ import {
   composeSchroedingerVertexShader2D,
   type SchroedingerWGSLShaderConfig,
 } from '../../shaders/schroedinger/compose'
+import { horizonVertex } from '../../shaders/schroedinger/volume/mainModularHorizon.wgsl'
 import { LIGHTING_UNIFORMS_SIZE } from '../../utils/lighting'
 import { BASIS_UNIFORMS_SIZE } from '../basisLayout'
 import { CAMERA_UNIFORMS_SIZE } from '../cameraLayout'
 import { MATERIAL_UNIFORMS_SIZE } from '../materialLayout'
-import { computePipelineCacheKey, isComputeQuantumMode } from '../rendererConfigUtils'
+import { computePipelineCacheKey, isPipeline2D } from '../rendererConfigUtils'
 import {
   type SchrodingerRendererConfig,
   SCHROEDINGER_UNIFORM_SIZE,
@@ -204,8 +205,7 @@ async function createSchrodingerPipelineImpl(
   deps: PipelineCreationDeps
 ): Promise<SchrodingerPipelineResources> {
   const dim = rendererConfig.dimension ?? 3
-  const isComputeMode = isComputeQuantumMode(rendererConfig)
-  const pipelineIs2D = !isComputeMode && (dim === 2 || rendererConfig.representation === 'wigner')
+  const pipelineIs2D = isPipeline2D(rendererConfig)
 
   // =====================================================================
   // Phase 3: Render pipeline — check cache or start async compilation
@@ -255,9 +255,11 @@ async function createSchrodingerPipelineImpl(
   if (!cachedPipeline || !shaderDebugInfo) {
     const fragmentComposition = composeSchroedingerShader(shaderConfig)
     fragmentShader = fragmentComposition.wgsl
-    vertexShader = pipelineIs2D
-      ? composeSchroedingerVertexShader2D()
-      : composeSchroedingerVertexShader()
+    vertexShader = shaderConfig.isModularHorizon
+      ? horizonVertex
+      : pipelineIs2D
+        ? composeSchroedingerVertexShader2D()
+        : composeSchroedingerVertexShader()
     shaderDebugInfo = {
       name: 'object',
       vertexShaderLength: vertexShader.length,

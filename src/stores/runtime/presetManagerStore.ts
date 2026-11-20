@@ -183,6 +183,10 @@ function restoreGeometryAndExtended(data: SavedScene['data']): void {
   useExtendedObjectStore.setState(
     mergeExtendedObjectStateForType(sanitizeExtendedLoadedState(data.extended), loadedObjectType)
   )
+  // Geometry lands before its quantum mode. Reapply the active registry bounds
+  // now that the saved mode is known (older scenes may use a retired dimension).
+  const geometry = useGeometryStore.getState()
+  geometry.setDimension(geometry.dimension)
 }
 
 /** Restore transform state via store actions to preserve invariants. */

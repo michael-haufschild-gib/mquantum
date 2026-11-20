@@ -6,8 +6,9 @@
  *
  * @module stores/slices/geometry/setters/quantumModeSetters
  */
-
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
+import type { HorizonPreset } from '@/lib/geometry/extended/modularHorizon'
+import type { ModularKnotPresetName } from '@/lib/geometry/extended/modularKnot'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import {
   getHydrogenNDPreset,
@@ -160,6 +161,7 @@ const POSITION_ONLY_HORIZON_MODES = new Set<SchroedingerConfig['quantumMode']>([
   'hilbertPolya',
   'bifurcationHorizon',
   'modularKnot',
+  'modularHorizon',
   // WDW ⊗ ζ suite (all position-only volumetric modes)
   'constraintSeam',
   'moebiusNoBoundary',
@@ -392,11 +394,10 @@ function applyFirstPreset(
         presetId as import('@/lib/geometry/extended/bifurcationHorizon').BifurcationHorizonPresetName
       )
       break
+    case 'modularHorizon':
+      return store.setModularHorizonPreset(presetId as HorizonPreset)
     case 'modularKnot':
-      store.setModularKnotPreset(
-        presetId as import('@/lib/geometry/extended/modularKnot').ModularKnotPresetName
-      )
-      break
+      return store.setModularKnotPreset(presetId as ModularKnotPresetName)
   }
 }
 
@@ -440,6 +441,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
             ...reprOverrides,
             ...resizeUpdates,
             ...renderingSettings,
+            ...(mode === 'modularHorizon' ? { isoEnabled: false } : {}),
           },
         }
       })

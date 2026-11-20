@@ -62,6 +62,7 @@ export type QuantumTypeStrategyKind =
   | 'hilbertPolya'
   | 'bifurcationHorizon'
   | 'modularKnot'
+  | 'modularHorizon'
   | 'wdwZetaVolume'
   | 'pauli'
   | 'bellPair'
@@ -143,6 +144,8 @@ export interface RenderingCapabilities {
    * Only applicable to types with density-based rendering (e.g., Schroedinger).
    */
   supportsEmission?: boolean
+  /** Uses the shared lighting, quantum-effect and temporal sampling pipeline. */
+  supportsSharedVolumeEffects?: boolean
 }
 
 // ============================================================================

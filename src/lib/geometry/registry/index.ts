@@ -58,6 +58,7 @@ export {
   resolveQuantumTypeKey,
   supportsOpenQuantumForQuantumType,
   supportsSchroedingerSurfaceMode,
+  supportsSharedVolumeEffects,
 } from './helpers'
 
 // Helpers — per-ObjectType API derived from QUANTUM_TYPE_REGISTRY

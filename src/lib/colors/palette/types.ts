@@ -445,6 +445,12 @@ function horizonGroupColorOptions(
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] | null {
   if (objectType !== 'schroedinger') return null
   if (isWdwZetaMode(quantumMode)) return wdwZetaSuiteColorOptions(quantumMode)
+  if (quantumMode === 'modularHorizon')
+    return COLOR_ALGORITHM_OPTIONS.filter((o) =>
+      ['blackbody', 'viridis', 'densityContours', 'phaseCyclicUniform', 'phaseDensity'].includes(
+        o.value
+      )
+    )
   if (SPECTRAL_HORIZON_MODES.has(quantumMode)) {
     const base = new Set<string>(['mixed', 'phase', 'blackbody', 'viridis', 'densityContours'])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => base.has(opt.value))

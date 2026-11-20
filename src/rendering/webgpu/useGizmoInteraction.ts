@@ -16,9 +16,15 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 
 import { directionToRotation } from '@/lib/lighting/lightSource'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import { useLightingStore } from '@/stores/scene/lightingStore'
 
 import type { WebGPUCamera } from './core/WebGPUCamera'
+import {
+  horizonProjection,
+  pickHorizon,
+} from './renderers/strategies/ModularHorizonStrategy/picking'
 import {
   computeMouseRay,
   computeRotateDragRotation,
@@ -192,6 +198,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
       activePointerIdRef.current = null
 
       if (!wasClick) return
+      if (pickHorizonDetector(e)) return
       handleClickToSelect(cameraRef, overlayRef, e)
     },
     [cameraRef]
@@ -519,4 +526,26 @@ function applyGroundTargetDrag(
     const newRot = directionToRotation([dirX / dirLen, dirY / dirLen, dirZ / dirLen])
     lighting.updateLight(drag.lightId, { rotation: newRot })
   }
+}
+
+function pickHorizonDetector(e: React.PointerEvent): boolean {
+  const store = useExtendedObjectStore.getState()
+  if (
+    useGeometryStore.getState().objectType === 'schroedinger' &&
+    store.schroedinger.quantumMode === 'modularHorizon'
+  ) {
+    const { camera, axes } = horizonProjection
+    const rect = e.currentTarget.getBoundingClientRect()
+    if (camera && axes) {
+      const pin = pickHorizon(
+        (2 * (e.clientX - rect.left)) / rect.width - 1,
+        1 - (2 * (e.clientY - rect.top)) / rect.height,
+        camera,
+        axes
+      )
+      if (pin) store.setModularHorizonConfig({ pin })
+    }
+    return true
+  }
+  return false
 }

@@ -316,6 +316,50 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
   ],
 
   [
+    'modularHorizon',
+    {
+      key: 'modularHorizon',
+      name: 'The Silent Horizon',
+      description:
+        'Quantum recurrence of three Maass cusp modes on a modular AdS₄ black hole horizon.',
+      category: 'analytic',
+      runtime: {
+        dataPath: 'analyticWavefunction',
+        strategy: 'modularHorizon',
+        evolutionReset: 'schroedingerAnalytic',
+        shaderUniformId: 26,
+        stateSaveId: 28,
+        defaultColorAlgorithm: 'phaseCyclicUniform',
+        supportsOpenQuantum: false,
+      },
+      dimensions: {
+        min: 2,
+        max: 3,
+        recommended: 3,
+        recommendedReason:
+          '3D follows the radial master field through the black hole exterior. 2D shows its angular modes.',
+      },
+      rendering: {
+        ...SHARED_RENDERING,
+        supportsSharedVolumeEffects: false,
+        supportsEdges: false,
+      },
+      animation: { hasTypeSpecificAnimations: false, systems: {} },
+      urlSerialization: { typeKey: 'modularHorizon', serializableParams: ['mh'] },
+      ui: {
+        controlsComponentKey: 'SchroedingerControls',
+        hasTimelineControls: true,
+        qualityPresets: QUALITY_PRESETS,
+      },
+      internal: {
+        objectType: 'schroedinger',
+        quantumMode: 'modularHorizon',
+        configStoreKey: 'schroedinger',
+        configSubKey: 'modularHorizon',
+      },
+    },
+  ],
+  [
     'modularKnot',
     {
       key: 'modularKnot',

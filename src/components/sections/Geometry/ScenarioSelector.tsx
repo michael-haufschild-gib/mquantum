@@ -19,6 +19,7 @@ import type { CoherenceHorizonConfig } from '@/lib/geometry/extended/coherenceHo
 import { COHERENCE_HORIZON_SCENARIOS } from '@/lib/geometry/extended/coherenceHorizon'
 import type { HilbertPolyaConfig } from '@/lib/geometry/extended/hilbertPolya'
 import { HILBERT_POLYA_SCENARIOS } from '@/lib/geometry/extended/hilbertPolya'
+import { HORIZON_SCENARIOS } from '@/lib/geometry/extended/modularHorizon'
 import type { ModularKnotConfig } from '@/lib/geometry/extended/modularKnot'
 import { MODULAR_KNOT_SCENARIOS } from '@/lib/geometry/extended/modularKnot'
 import type { RiemannZetaConfig } from '@/lib/geometry/extended/riemannZeta'
@@ -264,6 +265,8 @@ function findActiveDescription(
   if (mode === 'modularKnot') {
     return findTaggedScenarioDescription(MODULAR_KNOT_SCENARIOS, modularKnot)
   }
+  if (mode === 'modularHorizon')
+    return findTaggedScenarioDescription(HORIZON_SCENARIOS, activeValue)
   const table = ID_PRESET_TABLES[mode]
   if (!table || !activeValue) return null
   return findPresetDescriptionById(table, activeValue)
@@ -335,6 +338,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setHilbertPolyaPreset: s.setHilbertPolyaPreset,
       setBifurcationHorizonPreset: s.setBifurcationHorizonPreset,
       setModularKnotPreset: s.setModularKnotPreset,
+      setModularHorizonPreset: s.setModularHorizonPreset,
       setWdwZetaPreset: s.setWdwZetaPreset,
       setBellPairConfig: s.setBellPairConfig,
     }))
@@ -390,6 +394,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return HILBERT_POLYA_PRESET_OPTIONS
       case 'bifurcationHorizon':
         return BIFURCATION_HORIZON_PRESET_OPTIONS
+      case 'modularHorizon':
+        return HORIZON_SCENARIOS.map((p) => ({ value: p.id, label: p.label }))
       case 'modularKnot':
         return MODULAR_KNOT_PRESET_OPTIONS
       default:
@@ -408,6 +414,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       hilbertPolya: hilbertPolyaPreset,
       bifurcationHorizon: bifurcationHorizonPreset,
       modularKnot: modularKnotPreset,
+      modularHorizon: schroedinger.modularHorizon.preset,
     }
     if (mode in tagged) {
       const v = tagged[mode]

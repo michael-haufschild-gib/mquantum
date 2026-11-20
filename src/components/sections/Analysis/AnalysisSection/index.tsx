@@ -62,6 +62,8 @@ import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
+import { ModularHorizonAnalysis } from '../ModularHorizonAnalysisSection'
+
 /**
  * Props for AnalysisSection.
  *
@@ -192,6 +194,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       )
     }
 
+    if (quantumMode === 'modularHorizon') return <ModularHorizonAnalysis />
     const isAnalytic = isAnalyticQuantumType(quantumMode)
 
     // Analytic modes require 3D+ and non-Wigner representation for cross-section

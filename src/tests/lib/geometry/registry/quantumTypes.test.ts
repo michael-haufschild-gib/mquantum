@@ -24,6 +24,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'riemannZeta',
       'hilbertPolya',
       'bifurcationHorizon',
+      'modularHorizon',
       'modularKnot',
       'constraintSeam',
       'moebiusNoBoundary',
@@ -99,6 +100,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       riemannZeta: 'schroedingerAnalytic',
       hilbertPolya: 'schroedingerAnalytic',
       bifurcationHorizon: 'schroedingerAnalytic',
+      modularHorizon: 'schroedingerAnalytic',
       modularKnot: 'schroedingerAnalytic',
       constraintSeam: 'schroedingerAnalytic',
       moebiusNoBoundary: 'schroedingerAnalytic',
@@ -144,6 +146,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       riemannZeta: [],
       hilbertPolya: [],
       bifurcationHorizon: [],
+      modularHorizon: [],
       modularKnot: [],
       constraintSeam: [],
       moebiusNoBoundary: [],
@@ -246,7 +249,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
     }
   })
 
-  it('rendering method is "raymarch" for all entries', () => {
+  it('declares the rendering method used by each strategy', () => {
     for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
       expect(entry.rendering.renderMethod, `${key}`).toBe('raymarch')
     }

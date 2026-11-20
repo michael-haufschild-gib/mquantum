@@ -8,7 +8,10 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
-import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import {
+  supportsSchroedingerSurfaceMode,
+  supportsSharedVolumeEffects,
+} from '@/lib/geometry/registry'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 import {
   type ExtendedObjectState,
@@ -114,6 +117,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
 
   const isPauli = objectType === 'pauliSpinor'
   const isBellPair = objectType === 'bellPair'
+  const sharedEffects = supportsSharedVolumeEffects(objectType, quantumMode)
   const isSchroedinger = objectType === 'schroedinger'
   const effectiveIsoEnabled =
     isoEnabled &&
@@ -134,6 +138,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
   const showVolumetric =
     !effectiveIsoEnabled &&
     !isWdwZeta &&
+    sharedEffects &&
     (isPauli || isBellPair || (dimension > 2 && representation !== 'wigner'))
 
   return (
@@ -205,7 +210,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
 
         {/* Emission & Rim */}
         <ControlGroup
-          title="Emission & Rim"
+          title={sharedEffects ? 'Emission & Rim' : 'Emission'}
           collapsible
           defaultOpen
           data-testid="control-group-emission-rim"
