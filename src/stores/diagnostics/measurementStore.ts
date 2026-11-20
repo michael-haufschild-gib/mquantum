@@ -66,6 +66,7 @@ interface MeasurementState {
   requestMeasurement: (clickPosition: [number, number, number]) => void
   startCollapse: () => void
   completeMeasurement: (position: number[], density: number, measuredAxis: number | null) => void
+  cancelCollapse: () => void
   tickCooldown: () => void
   /**
    * @internal Test-only seam for seeding measurement records without the
@@ -87,36 +88,24 @@ function computeStats(measurements: MeasurementRecord[]): {
   positionMean: number[]
   positionStd: number[]
 } {
-  // Failed readbacks (TdseBecMeasurement → completeMeasurement([], 0, null))
-  // append a record with `position: []`. Pick the latticeDim from the FIRST
-  // valid record and skip any record whose position length doesn't match —
-  // otherwise `m.position[d]` returns undefined for the empty record and NaN
-  // poisons every accumulator, surfacing as `NaN` in the stats table.
-  const firstValid = measurements.find((m) => m.position.length > 0)
-  if (!firstValid) return { positionMean: [], positionStd: [] }
-
-  const dims = firstValid.position.length
+  const dims = measurements.find((m) => m.position.length > 0)?.position.length ?? 0
+  const counts = new Array<number>(dims).fill(0)
   const mean = new Array<number>(dims).fill(0)
-  const sq = new Array<number>(dims).fill(0)
-  let n = 0
-
-  for (const m of measurements) {
-    if (m.position.length !== dims) continue
+  const m2 = new Array<number>(dims).fill(0)
+  for (const { position, measuredAxis } of measurements) {
+    if (position.length !== dims) continue
     for (let d = 0; d < dims; d++) {
-      mean[d]! += m.position[d]!
-      sq[d]! += m.position[d]! * m.position[d]!
+      if (measuredAxis !== null && measuredAxis !== d) continue
+      counts[d]!++
+      const delta = position[d]! - mean[d]!
+      mean[d]! += delta / counts[d]!
+      m2[d]! += delta * (position[d]! - mean[d]!)
     }
-    n += 1
   }
-
-  if (n === 0) return { positionMean: [], positionStd: [] }
-  const positionMean = mean.map((s) => s / n)
-  const positionStd = sq.map((s2, d) => {
-    const variance = s2 / n - positionMean[d]! * positionMean[d]!
-    return Math.sqrt(Math.max(0, variance))
-  })
-
-  return { positionMean, positionStd }
+  return {
+    positionMean: mean.map((value, d) => (counts[d] ? value : NaN)),
+    positionStd: m2.map((value, d) => (counts[d] ? Math.sqrt(value / counts[d]!) : NaN)),
+  }
 }
 
 export const useMeasurementStore = create<MeasurementState>((set) => ({
@@ -161,6 +150,7 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
 
   completeMeasurement: (position, density, measuredAxis) => {
     set((state) => {
+      if (position.length === 0) return { isCollapsing: false }
       const record: MeasurementRecord = {
         position: [...position],
         density,
@@ -178,6 +168,8 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
       }
     })
   },
+
+  cancelCollapse: () => set({ isCollapsing: false }),
 
   tickCooldown: () =>
     set((state) => ({

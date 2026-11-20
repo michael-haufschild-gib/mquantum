@@ -18,14 +18,6 @@ vi.mock('@/lib/audio/SoundManager', () => ({
 beforeEach(() => {
   HTMLElement.prototype.showPopover = vi.fn()
   HTMLElement.prototype.hidePopover = vi.fn()
-  // Mock matches for :popover-open pseudo-class
-  const originalMatches = HTMLElement.prototype.matches
-  HTMLElement.prototype.matches = function (selector: string) {
-    if (selector === ':popover-open') {
-      return this.hasAttribute('data-popover-open')
-    }
-    return originalMatches.call(this, selector)
-  }
 })
 
 describe('Popover', () => {

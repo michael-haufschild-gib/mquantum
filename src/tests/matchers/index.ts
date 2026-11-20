@@ -110,17 +110,21 @@ interface DensityMatrix {
 
 function toHaveUnitTrace(received: DensityMatrix, tolerance = 1e-6): ExpectationResult {
   let trace = 0
+  let traceIm = 0
   for (let k = 0; k < received.K; k++) {
-    trace += received.elements[2 * (k * received.K + k)]!
+    const idx = 2 * (k * received.K + k)
+    trace += received.elements[idx]!
+    traceIm += received.elements[idx + 1]!
   }
 
-  const pass = Math.abs(trace - 1.0) < tolerance
+  const delta = Math.hypot(trace - 1, traceIm)
+  const pass = delta <= tolerance
   return {
     pass,
     message: () =>
       pass
-        ? `Expected density matrix NOT to have unit trace, but Tr(rho) = ${trace}`
-        : `Expected Tr(rho) = 1.0, got ${trace} (delta: ${Math.abs(trace - 1.0)}, tolerance: ${tolerance})`,
+        ? `Expected density matrix NOT to have unit trace, but Tr(rho) = ${trace} + ${traceIm}i`
+        : `Expected Tr(rho) = 1.0, got ${trace} + ${traceIm}i (delta: ${delta}, tolerance: ${tolerance})`,
   }
 }
 
@@ -128,17 +132,21 @@ function toBeHermitian(received: DensityMatrix, tolerance = 1e-10): ExpectationR
   const violations: string[] = []
 
   for (let k = 0; k < received.K; k++) {
+    const diag = 2 * (k * received.K + k)
+    if (
+      !Number.isFinite(received.elements[diag]) ||
+      !(2 * Math.abs(received.elements[diag + 1]!) <= tolerance)
+    ) {
+      violations.push(`Invalid diagonal entry at ${k}`)
+    }
     for (let l = k + 1; l < received.K; l++) {
       const idx_kl = 2 * (k * received.K + l)
       const idx_lk = 2 * (l * received.K + k)
       const realDiff = Math.abs(received.elements[idx_kl]! - received.elements[idx_lk]!)
       const imagDiff = Math.abs(received.elements[idx_kl + 1]! + received.elements[idx_lk + 1]!)
 
-      if (realDiff > tolerance) {
-        violations.push(`Re(rho[${k},${l}]) - Re(rho[${l},${k}]) = ${realDiff}`)
-      }
-      if (imagDiff > tolerance) {
-        violations.push(`Im(rho[${k},${l}]) + Im(rho[${l},${k}]) = ${imagDiff}`)
+      if (!(Math.hypot(realDiff, imagDiff) <= tolerance)) {
+        violations.push(`Off-diagonal mismatch at [${k},${l}]: (${realDiff}, ${imagDiff})`)
       }
     }
   }
@@ -221,24 +229,13 @@ expect.extend({
   toBeOrthogonalTo,
 })
 
-// Augment Vitest's Assertion type
 declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  interface Assertion<T = any> {
-    toBeValidWGSL(shaderType?: 'fragment' | 'vertex' | 'compute'): T
-    toHaveNoGLSLLeakage(): T
-    toHaveUnitTrace(tolerance?: number): T
-    toBeHermitian(tolerance?: number): T
-    toBeNormalizedVector(tolerance?: number): T
-    toBeOrthogonalTo(other: number[] | Float32Array | Float64Array, tolerance?: number): T
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  interface AsymmetricMatchersContaining<T = any> {
-    toBeValidWGSL(shaderType?: 'fragment' | 'vertex' | 'compute'): T
-    toHaveNoGLSLLeakage(): T
-    toHaveUnitTrace(tolerance?: number): T
-    toBeHermitian(tolerance?: number): T
-    toBeNormalizedVector(tolerance?: number): T
-    toBeOrthogonalTo(other: number[] | Float32Array | Float64Array, tolerance?: number): T
+  interface Matchers<R extends void | Promise<void> = void | Promise<void>> {
+    toBeValidWGSL(shaderType?: 'fragment' | 'vertex' | 'compute'): R
+    toHaveNoGLSLLeakage(): R
+    toHaveUnitTrace(tolerance?: number): R
+    toBeHermitian(tolerance?: number): R
+    toBeNormalizedVector(tolerance?: number): R
+    toBeOrthogonalTo(other: number[] | Float32Array | Float64Array, tolerance?: number): R
   }
 }

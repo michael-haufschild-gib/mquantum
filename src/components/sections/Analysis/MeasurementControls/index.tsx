@@ -201,8 +201,12 @@ export const MeasurementControls: React.FC = React.memo(() => {
               {positionMean.map((mean, d) => (
                 <div key={d} className="flex gap-2 text-text-secondary">
                   <span className="w-4 text-text-tertiary">{DIM_LABELS[d]}</span>
-                  <span className="w-16 text-right">{mean.toFixed(3)}</span>
-                  <span className="w-12 text-right">{(positionStd[d] ?? 0).toFixed(3)}</span>
+                  <span className="w-16 text-right">
+                    {Number.isFinite(mean) ? mean.toFixed(3) : '—'}
+                  </span>
+                  <span className="w-12 text-right">
+                    {Number.isFinite(positionStd[d]) ? positionStd[d]!.toFixed(3) : '—'}
+                  </span>
                 </div>
               ))}
             </div>

@@ -4,7 +4,7 @@
  * Provides parabolic approximations for sin() and cos() that are:
  * - ~3x faster than Math.sin/Math.cos
  * - Seamless (no discontinuities at period boundaries)
- * - Accurate enough for visual animations (max error ~1.2%)
+ * - Accurate enough for visual animations (max absolute error <0.057)
  *
  * NOT suitable for:
  * - Physics calculations requiring precision
@@ -12,7 +12,6 @@
  * - Arc drawing / UI positioning
  *
  * PERFECT for:
- * - Rotation matrices in animation loops
  * - Origin drift oscillation
  * - Dimension mixing animations
  * - Any visual effect where smooth motion matters more than precision
@@ -31,7 +30,7 @@ const PI_SQ_INV_4 = 4 / (PI * PI)
  * This formula:
  * - Hits exact values at x = 0, ±π/2, ±π
  * - Is continuous and smooth across the domain
- * - Has maximum error of ~1.2% at x ≈ ±0.7
+ * - Has maximum absolute error below 0.057
  *
  * @param x - Angle in radians (any value, automatically normalized)
  * @returns Approximate sine value in range [-1, 1]

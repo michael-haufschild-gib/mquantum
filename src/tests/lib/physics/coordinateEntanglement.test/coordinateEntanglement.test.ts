@@ -423,6 +423,40 @@ describe('computeCoordinateEntanglement', () => {
     expect(result.averageEntropy).toBeCloseTo(Math.log(M), 8)
   })
 
+  it('preserves the entropy of a uniformly attenuated entangled state', () => {
+    const re = new Float32Array([1e-24, 0, 0, 1e-24])
+    const result = computeCoordinateEntanglement(re, new Float32Array(4), [2, 2], {
+      computePairwiseMI: false,
+      computeBipartitions: false,
+      computeWignerNegativity: false,
+    })
+    expect(result.averageEntropy).toBeCloseTo(Math.LN2, 6)
+  })
+
+  it('normalizes rectangular Schmidt pairs by the smaller subsystem', () => {
+    const re = new Float32Array(2 * 4)
+    re[0] = re[5] = Math.SQRT1_2
+    const result = computeCoordinateEntanglement(re, new Float32Array(re.length), [2, 4], {
+      computePairwiseMI: true,
+      computeBipartitions: true,
+      computeWignerNegativity: false,
+    })
+    expect(result.maxEntropies).toEqual([Math.LN2, Math.LN2])
+    expect(result.normalizedEntropy).toBeCloseTo(1, 6)
+    expect(result.bipartitionEntropies[0]).toBeCloseTo(Math.LN2, 6)
+  })
+
+  it('recovers pairwise information when the joint RDM would exceed its size cap', () => {
+    const re = new Float32Array(64 * 32 * 2)
+    re[0] = re[2 * (32 + 1) + 1] = Math.SQRT1_2
+    const result = computeCoordinateEntanglement(re, new Float32Array(re.length), [64, 32, 2], {
+      computePairwiseMI: true,
+      computeBipartitions: false,
+      computeWignerNegativity: false,
+    })
+    expect(result.mutualInfo![1]).toBeCloseTo(Math.LN2, 6)
+  })
+
   it('spectrum is sorted descending and sums to 1', () => {
     const M = 8
     const totalSites = M * M

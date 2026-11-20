@@ -17,7 +17,7 @@ use std::cell::RefCell;
 // Constants
 // ============================================================================
 
-/// Maximum N for pre-allocated scratch pools. Covers K=14 → N=196.
+/// Maximum N retained in the thread-local workspace. Covers K=14 → N=196.
 const MAX_PADE_N: usize = 196;
 
 /// Padé(13,13) coefficients b_k. Identical to the TypeScript `PADE_COEFFS_13`.
@@ -41,15 +41,11 @@ const PADE_COEFFS_13: [f64; 14] = [
 /// θ₁₃ threshold for Padé(13,13) approximation (Al-Mohy & Higham 2009).
 const THETA_13: f64 = 5.371_920_351_148_152;
 
-/// Pivot magnitude² threshold for singular detection in Gaussian elimination.
-const SINGULAR_THRESHOLD: f64 = 1e-30;
-
 // ============================================================================
 // Scratch Buffers (thread_local — WASM is single-threaded)
 // ============================================================================
 
-/// Pre-allocated scratch pool for the Padé algorithm.
-/// Each buffer is sized for MAX_PADE_N × MAX_PADE_N = 38,416 f64 elements.
+/// Workspace sized for the largest cached Padé problem seen so far.
 struct PadeScratch {
     // Matrix powers
     a_scaled_re: Vec<f64>,
@@ -70,19 +66,10 @@ struct PadeScratch {
     u_im: Vec<f64>,
     v_re: Vec<f64>,
     v_im: Vec<f64>,
-    // Squaring scratch
-    sq_re: Vec<f64>,
-    sq_im: Vec<f64>,
-    // Solve scratch
-    solve_a_re: Vec<f64>,
-    solve_a_im: Vec<f64>,
-    solve_b_re: Vec<f64>,
-    solve_b_im: Vec<f64>,
 }
 
 impl PadeScratch {
-    fn new() -> Self {
-        let cap = MAX_PADE_N * MAX_PADE_N;
+    fn new(cap: usize) -> Self {
         Self {
             a_scaled_re: vec![0.0; cap],
             a_scaled_im: vec![0.0; cap],
@@ -100,18 +87,12 @@ impl PadeScratch {
             u_im: vec![0.0; cap],
             v_re: vec![0.0; cap],
             v_im: vec![0.0; cap],
-            sq_re: vec![0.0; cap],
-            sq_im: vec![0.0; cap],
-            solve_a_re: vec![0.0; cap],
-            solve_a_im: vec![0.0; cap],
-            solve_b_re: vec![0.0; cap],
-            solve_b_im: vec![0.0; cap],
         }
     }
 }
 
 thread_local! {
-    static SCRATCH: RefCell<PadeScratch> = RefCell::new(PadeScratch::new());
+    static SCRATCH: RefCell<PadeScratch> = RefCell::new(PadeScratch::new(0));
 }
 
 // ============================================================================
@@ -181,7 +162,10 @@ fn complex_mat_norm1(a_re: &[f64], a_im: &[f64], n: usize) -> f64 {
         let mut col_sum = 0.0_f64;
         for i in 0..n {
             let idx = i * n + j;
-            col_sum += (a_re[idx] * a_re[idx] + a_im[idx] * a_im[idx]).sqrt();
+            col_sum += a_re[idx].hypot(a_im[idx]);
+        }
+        if !col_sum.is_finite() {
+            return col_sum;
         }
         if col_sum > max_col {
             max_col = col_sum;
@@ -215,32 +199,18 @@ fn complex_mat_scale(
 
 /// Solve Q · X = P via Gaussian elimination with partial pivoting.
 ///
-/// Works on pre-allocated scratch buffers (caller provides them).
+/// Eliminates both input matrices in place.
 /// Result is written into `result_re` and `result_im`.
 #[allow(clippy::too_many_arguments)]
 fn solve_linear_system_into(
-    q_re: &[f64],
-    q_im: &[f64],
-    p_re: &[f64],
-    p_im: &[f64],
-    n: usize,
-    // Scratch buffers (must be >= n*n each)
     ar: &mut [f64],
     ai: &mut [f64],
     br: &mut [f64],
     bi: &mut [f64],
-    // Output
+    n: usize,
     result_re: &mut [f64],
     result_im: &mut [f64],
-) {
-    let size = n * n;
-
-    // Copy inputs to scratch
-    ar[..size].copy_from_slice(&q_re[..size]);
-    ai[..size].copy_from_slice(&q_im[..size]);
-    br[..size].copy_from_slice(&p_re[..size]);
-    bi[..size].copy_from_slice(&p_im[..size]);
-
+) -> bool {
     // Forward elimination with partial pivoting
     for col in 0..n {
         // Find pivot row
@@ -248,7 +218,7 @@ fn solve_linear_system_into(
         let mut max_row = col;
         for row in col..n {
             let idx = row * n + col;
-            let mag = ar[idx] * ar[idx] + ai[idx] * ai[idx];
+            let mag = ar[idx].abs().max(ai[idx].abs());
             if mag > max_mag {
                 max_mag = mag;
                 max_row = row;
@@ -267,30 +237,34 @@ fn solve_linear_system_into(
             }
         }
 
-        let piv_re = ar[col * n + col];
-        let piv_im = ai[col * n + col];
-        let piv_mag2 = piv_re * piv_re + piv_im * piv_im;
-        if piv_mag2 < SINGULAR_THRESHOLD {
-            // Near-singular pivot — fill result column with NaN to signal failure
-            // rather than silently returning a wrong answer.
-            for row in 0..n {
-                result_re[row * n + col] = f64::NAN;
-                result_im[row * n + col] = f64::NAN;
+        if max_mag == 0.0 {
+            return false;
+        }
+        let pivot = col * n + col;
+        let pr = ar[pivot] / max_mag;
+        let pi = ai[pivot] / max_mag;
+        let denom = pr * pr + pi * pi;
+        let wr = pr / denom;
+        let wi = pi / denom;
+        for j in 0..n {
+            let idx = col * n + j;
+            if j > col {
+                let re = ar[idx] / max_mag;
+                let im = ai[idx] / max_mag;
+                ar[idx] = re * wr + im * wi;
+                ai[idx] = im * wr - re * wi;
             }
-            continue;
+            let re = br[idx] / max_mag;
+            let im = bi[idx] / max_mag;
+            br[idx] = re * wr + im * wi;
+            bi[idx] = im * wr - re * wi;
         }
 
-        // Eliminate rows below
         for row in (col + 1)..n {
             let idx = row * n + col;
-            let a_re_val = ar[idx];
-            let a_im_val = ai[idx];
-
-            // factor = A[row][col] / A[col][col]
-            let f_re = (a_re_val * piv_re + a_im_val * piv_im) / piv_mag2;
-            let f_im = (a_im_val * piv_re - a_re_val * piv_im) / piv_mag2;
-
-            for j in col..n {
+            let f_re = ar[idx];
+            let f_im = ai[idx];
+            for j in (col + 1)..n {
                 let pj = col * n + j;
                 let rj = row * n + j;
                 ar[rj] -= f_re * ar[pj] - f_im * ai[pj];
@@ -307,8 +281,6 @@ fn solve_linear_system_into(
     }
 
     // Back substitution
-    zero_slice(result_re, size);
-    zero_slice(result_im, size);
 
     for j in 0..n {
         for row in (0..n).rev() {
@@ -324,17 +296,11 @@ fn solve_linear_system_into(
                 sum_im -= a_re_val * x_im + a_im_val * x_re;
             }
 
-            let piv_re = ar[row * n + row];
-            let piv_im = ai[row * n + row];
-            let piv_mag2 = piv_re * piv_re + piv_im * piv_im;
-            if piv_mag2 < SINGULAR_THRESHOLD {
-                continue;
-            }
-
-            result_re[row * n + j] = (sum_re * piv_re + sum_im * piv_im) / piv_mag2;
-            result_im[row * n + j] = (sum_im * piv_re - sum_re * piv_im) / piv_mag2;
+            result_re[row * n + j] = sum_re;
+            result_im[row * n + j] = sum_im;
         }
     }
+    true
 }
 
 /// Solve Q · X = P via Gaussian elimination with partial pivoting.
@@ -350,26 +316,19 @@ pub fn solve_linear_system(
     n: usize,
 ) -> (Vec<f64>, Vec<f64>) {
     let size = n * n;
-    let mut ar = vec![0.0; size];
-    let mut ai = vec![0.0; size];
-    let mut br = vec![0.0; size];
-    let mut bi = vec![0.0; size];
     let mut result_re = vec![0.0; size];
     let mut result_im = vec![0.0; size];
-
-    solve_linear_system_into(
-        q_re,
-        q_im,
-        p_re,
-        p_im,
+    if !solve_linear_system_into(
+        &mut q_re.to_vec(),
+        &mut q_im.to_vec(),
+        &mut p_re.to_vec(),
+        &mut p_im.to_vec(),
         n,
-        &mut ar,
-        &mut ai,
-        &mut br,
-        &mut bi,
         &mut result_re,
         &mut result_im,
-    );
+    ) {
+        return (Vec::new(), Vec::new());
+    }
 
     (result_re, result_im)
 }
@@ -389,7 +348,10 @@ pub fn matrix_exponential_pade(a_re: &[f64], a_im: &[f64], n: usize) -> (Vec<f64
     let norm = complex_mat_norm1(a_re, a_im, n);
 
     // Zero matrix → identity
-    if norm < SINGULAR_THRESHOLD {
+    if !norm.is_finite() {
+        return (Vec::new(), Vec::new());
+    }
+    if norm == 0.0 {
         let mut result_re = vec![0.0; size];
         let result_im = vec![0.0; size];
         for i in 0..n {
@@ -405,33 +367,13 @@ pub fn matrix_exponential_pade(a_re: &[f64], a_im: &[f64], n: usize) -> (Vec<f64
     if n <= MAX_PADE_N {
         SCRATCH.with(|cell| {
             let mut scratch = cell.borrow_mut();
+            if scratch.a_scaled_re.len() < size {
+                *scratch = PadeScratch::new(size);
+            }
             pade_impl(a_re, a_im, n, s, &mut scratch)
         })
     } else {
-        let mut scratch = PadeScratch {
-            a_scaled_re: vec![0.0; size],
-            a_scaled_im: vec![0.0; size],
-            a2_re: vec![0.0; size],
-            a2_im: vec![0.0; size],
-            a4_re: vec![0.0; size],
-            a4_im: vec![0.0; size],
-            a6_re: vec![0.0; size],
-            a6_im: vec![0.0; size],
-            temp1_re: vec![0.0; size],
-            temp1_im: vec![0.0; size],
-            temp2_re: vec![0.0; size],
-            temp2_im: vec![0.0; size],
-            u_re: vec![0.0; size],
-            u_im: vec![0.0; size],
-            v_re: vec![0.0; size],
-            v_im: vec![0.0; size],
-            sq_re: vec![0.0; size],
-            sq_im: vec![0.0; size],
-            solve_a_re: vec![0.0; size],
-            solve_a_im: vec![0.0; size],
-            solve_b_re: vec![0.0; size],
-            solve_b_im: vec![0.0; size],
-        };
+        let mut scratch = PadeScratch::new(size);
         pade_impl(a_re, a_im, n, s, &mut scratch)
     }
 }
@@ -526,26 +468,6 @@ fn compute_pade_uv(n: usize, scratch: &mut PadeScratch) {
     }
 }
 
-/// Zero all Padé scratch buffers for the first `size` elements.
-fn zero_pade_scratch(scratch: &mut PadeScratch, size: usize) {
-    zero_slice(&mut scratch.a_scaled_re, size);
-    zero_slice(&mut scratch.a_scaled_im, size);
-    zero_slice(&mut scratch.a2_re, size);
-    zero_slice(&mut scratch.a2_im, size);
-    zero_slice(&mut scratch.a4_re, size);
-    zero_slice(&mut scratch.a4_im, size);
-    zero_slice(&mut scratch.a6_re, size);
-    zero_slice(&mut scratch.a6_im, size);
-    zero_slice(&mut scratch.temp1_re, size);
-    zero_slice(&mut scratch.temp1_im, size);
-    zero_slice(&mut scratch.temp2_re, size);
-    zero_slice(&mut scratch.temp2_im, size);
-    zero_slice(&mut scratch.u_re, size);
-    zero_slice(&mut scratch.u_im, size);
-    zero_slice(&mut scratch.v_re, size);
-    zero_slice(&mut scratch.v_im, size);
-}
-
 /// Core Padé implementation using provided scratch buffers.
 fn pade_impl(
     a_re: &[f64],
@@ -555,7 +477,6 @@ fn pade_impl(
     scratch: &mut PadeScratch,
 ) -> (Vec<f64>, Vec<f64>) {
     let size = n * n;
-    zero_pade_scratch(scratch, size);
 
     // Scale: A_s = A / 2^s
     let scale_factor = (2.0_f64).powi(-s);
@@ -610,25 +531,20 @@ fn pade_impl(
     }
 
     // Solve Q * X = P, result goes into u_re/u_im (reusing as output buffer)
-    solve_linear_system_into(
-        &scratch.temp2_re,
-        &scratch.temp2_im,
-        &scratch.temp1_re,
-        &scratch.temp1_im,
+    if !solve_linear_system_into(
+        &mut scratch.temp2_re,
+        &mut scratch.temp2_im,
+        &mut scratch.temp1_re,
+        &mut scratch.temp1_im,
         n,
-        &mut scratch.solve_a_re,
-        &mut scratch.solve_a_im,
-        &mut scratch.solve_b_re,
-        &mut scratch.solve_b_im,
         &mut scratch.u_re,
         &mut scratch.u_im,
-    );
+    ) {
+        return (Vec::new(), Vec::new());
+    }
 
-    // X is now in u_re/u_im. Squaring phase: exp(A) = X^{2^s}
+    // The linear solve releases temp1 for squaring.
     if s > 0 {
-        zero_slice(&mut scratch.sq_re, size);
-        zero_slice(&mut scratch.sq_im, size);
-
         for i in 0..s {
             if i % 2 == 0 {
                 // X → sq
@@ -637,17 +553,17 @@ fn pade_impl(
                     &scratch.u_im,
                     &scratch.u_re,
                     &scratch.u_im,
-                    &mut scratch.sq_re,
-                    &mut scratch.sq_im,
+                    &mut scratch.temp1_re,
+                    &mut scratch.temp1_im,
                     n,
                 );
             } else {
                 // sq → X (u)
                 complex_mat_mul(
-                    &scratch.sq_re,
-                    &scratch.sq_im,
-                    &scratch.sq_re,
-                    &scratch.sq_im,
+                    &scratch.temp1_re,
+                    &scratch.temp1_im,
+                    &scratch.temp1_re,
+                    &scratch.temp1_im,
                     &mut scratch.u_re,
                     &mut scratch.u_im,
                     n,
@@ -657,8 +573,8 @@ fn pade_impl(
 
         if s % 2 == 1 {
             // Result is in sq — copy out
-            let result_re = scratch.sq_re[..size].to_vec();
-            let result_im = scratch.sq_im[..size].to_vec();
+            let result_re = scratch.temp1_re[..size].to_vec();
+            let result_im = scratch.temp1_im[..size].to_vec();
             return (result_re, result_im);
         }
     }
@@ -814,6 +730,16 @@ mod tests {
     }
 
     // ── Matrix Exponential ──
+
+    #[test]
+    fn test_expm_norm_extremes() {
+        assert_eq!(complex_mat_norm1(&[1e200], &[0.0], 1), 1e200);
+        let (re, _) = matrix_exponential_pade(&[0.0, 1e-40, 0.0, 0.0], &[0.0; 4], 2);
+        assert!((re[1] / 1e-40 - 1.0).abs() < 1e-14);
+        assert!(matrix_exponential_pade(&[f64::MAX; 4], &[0.0; 4], 2)
+            .0
+            .is_empty());
+    }
 
     #[test]
     fn test_expm_zero_matrix() {

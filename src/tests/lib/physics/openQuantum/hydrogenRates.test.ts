@@ -53,6 +53,11 @@ describe('einsteinA', () => {
 // ---------------------------------------------------------------------------
 
 describe('thermalOccupation', () => {
+  it('remains finite in the low-frequency classical limit', () => {
+    const x = 1e-18
+    expect(thermalOccupation(x * KB_ATOMIC, 1) * x).toBeCloseTo(1, 14)
+  })
+
   it('is positive for positive temperature', () => {
     // Bose-Einstein distribution is always > 0 for T > 0
     // Bug caught: returning negative or NaN

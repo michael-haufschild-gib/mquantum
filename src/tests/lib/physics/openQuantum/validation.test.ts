@@ -36,6 +36,22 @@ function maximallyMixedState(K: number) {
 // ---------------------------------------------------------------------------
 
 describe('validateDensityMatrix', () => {
+  it('rejects missing or non-finite data before estimating eigenvalues', () => {
+    for (const elements of [new Float64Array(2), new Float64Array(8).fill(NaN)]) {
+      expect(validateDensityMatrix({ K: 2, elements }).valid).toBe(false)
+    }
+  })
+
+  it('includes imaginary diagonal entries in the trace and Hermitian residual', () => {
+    const rho = { K: 1, elements: Float64Array.of(1, 0.25) }
+    const result = validateDensityMatrix(rho)
+    expect(result.traceDrift).toBe(0.25)
+    expect(result.hermitianResidual).toBe(0.5)
+    expect(rho).not.toHaveUnitTrace()
+    expect(rho).not.toBeHermitian()
+    expect({ K: 1, elements: Float64Array.of(NaN, 0) }).not.toBeHermitian()
+  })
+
   it('accepts a pure state |0⟩⟨0| with near-zero residuals', () => {
     const K = 4
     const re = [1, 0, 0, 0]
@@ -225,11 +241,16 @@ describe('validateDetailedBalance', () => {
     expect(validateDetailedBalance(bogusRates, 300)).toBe(false)
   })
 
+  it('detects a missing upward rate even for a small Boltzmann factor', () => {
+    const rate = { from: 1, to: 0, gammaDown: 1, gammaUp: 0, omega: 0.1, dipoleSq: 1 }
+    expect(validateDetailedBalance([rate], 300)).toBe(false)
+  })
+
   it('returns true for an empty rates array', () => {
     expect(validateDetailedBalance([], 300)).toBe(true)
   })
 
-  it('returns true when gammaDown is zero (skipped by the check)', () => {
+  it('requires both rates to vanish for a disabled transition', () => {
     const rates = [
       {
         from: 1,
@@ -241,7 +262,8 @@ describe('validateDetailedBalance', () => {
       },
     ]
 
-    // gammaDown <= 0 means the rate is skipped entirely
+    expect(validateDetailedBalance(rates, 300)).toBe(false)
+    rates[0]!.gammaUp = 0
     expect(validateDetailedBalance(rates, 300)).toBe(true)
   })
 

@@ -33,7 +33,6 @@ import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
-  DIAG_COLORS,
   DiagnosticScatter,
   type DimCompareData,
   DimensionComparison,
@@ -41,6 +40,7 @@ import {
   ErosionCurves,
   TripleHeatmap,
 } from '../QuantumnessAtlasVisualizations'
+import { DIAG_COLORS } from '../QuantumnessAtlasVisualizations/colors'
 import { useAtlasSweepController } from '../useAtlasSweepController'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

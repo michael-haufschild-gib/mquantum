@@ -82,9 +82,12 @@ describe('AdS packer scratch pool', () => {
       btzOmega: 2,
       btzAngularM: 2,
     })
-    const scratch = createAdsPackerScratch()
-    const pooled = packAntiDeSitterDensityGrid(config, scratch)
-    const fresh = packAntiDeSitterDensityGrid(config)
+    const scratch = createAdsPackerScratch(16)
+    const pooled = packAntiDeSitterDensityGrid(config, scratch, 16)
+    const fresh = packAntiDeSitterDensityGrid(config, undefined, 16)
+    const slice = 4 * 16 * 16
+    expect(pooled.density.subarray(0, slice)).toEqual(pooled.density.subarray(-slice))
+    expect(pooled.density.some((value, i) => i % 4 === 0 && value > 0)).toBe(true)
     expect(pooled.density.length).toBe(fresh.density.length)
     for (let i = 0; i < pooled.density.length; i++) {
       if (pooled.density[i] !== fresh.density[i]) {

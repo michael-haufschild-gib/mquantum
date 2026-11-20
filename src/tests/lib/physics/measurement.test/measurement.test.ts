@@ -154,24 +154,36 @@ describe('sampleFromDensity', () => {
     expect(result.density).toBeCloseTo(3.0)
   })
 
-  it('selects correct site at exact CDF boundary', () => {
-    // 4 sites: densities [0.25, 0.25, 0.25, 0.25], totalProb=1
-    // CDF: [0.25, 0.5, 0.75, 1.0]
-    const amp = 0.5
-    const psiRe = new Float32Array([amp, amp, amp, amp])
-    const psiIm = new Float32Array(4).fill(0)
-    const gridSize = [4]
-    const spacing = [1]
+  it('skips zero-mass intervals at zero and exact interior CDF boundaries', () => {
+    const re = new Float32Array([0, 1, 0, 1, 0])
+    const im = new Float32Array(5)
+    for (const [draw, expected] of [
+      [0, 1],
+      [0.5, 3],
+    ] as const) {
+      vi.spyOn(Math, 'random').mockReturnValue(draw)
+      expect(sampleFromDensity(re, im, [5], [1]).gridIndex).toBe(expected)
+      expect(sampleFromMarginalDensity(re, im, [5], [1], 0).axisIndex).toBe(expected)
+    }
+  })
 
-    // u = 0.25 → exactly at CDF[0]=0.25, binary search should give site 0
-    vi.spyOn(Math, 'random').mockReturnValue(0.25)
-    const result = sampleFromDensity(psiRe, psiIm, gridSize, spacing)
-    expect(result.gridIndex).toBe(0)
-
-    // u = 0.75 → exactly at CDF[2]=0.75, binary search should give site 2
-    vi.spyOn(Math, 'random').mockReturnValue(0.75)
-    const r2 = sampleFromDensity(psiRe, psiIm, gridSize, spacing)
-    expect(r2.gridIndex).toBe(2)
+  it('wraps full and partial collapse envelopes across torus boundaries', () => {
+    const options = { metric: { kind: 'torus' as const } }
+    const [full] = computeFullCollapse(4, [4], [1], [-1.5], 1, undefined, options)
+    const [partial] = computePartialCollapse(
+      new Float32Array(4).fill(1),
+      new Float32Array(4),
+      [4],
+      [1],
+      0,
+      -1.5,
+      1,
+      false,
+      options
+    )
+    for (const field of [full, partial]) {
+      expect(field[3]).toBeCloseTo(Math.exp(-0.5), 6)
+    }
   })
 
   it('samples from a Gaussian-like wavefunction with known RNG', () => {
@@ -196,7 +208,7 @@ describe('sampleFromDensity', () => {
     const target = 0.5 * totalProb
     let expectedIdx = 0
     for (let i = 0; i < 16; i++) {
-      if (cdf[i]! >= target) {
+      if (cdf[i]! > target) {
         expectedIdx = i
         break
       }
@@ -279,33 +291,14 @@ describe('sampleFromMarginalDensity', () => {
     expect(result.marginalDensity).toBeCloseTo(1)
   })
 
-  it('marginal sums equal total probability', () => {
-    // Non-trivial 3x4 wavefunction
-    const psiRe = new Float32Array([1, 2, 0.5, 3, 0, 1, 2, 0, 0.5, 0, 1, 1.5])
-
-    // Compute total probability
-    let totalProb = 0
-    for (let i = 0; i < 12; i++) totalProb += psiRe[i]! * psiRe[i]!
-
-    // Marginal along axis 0 (sum over axis 1 for each row)
-    // Row 0: 1+4+0.25+9=14.25, Row 1: 0+1+4+0=5, Row 2: 0.25+0+1+2.25=3.5
-    // Sum = 22.75
-    const marginals0 = [0, 0, 0]
-    for (let i = 0; i < 12; i++) {
-      const row = Math.floor(i / 4)
-      marginals0[row] = (marginals0[row] ?? 0) + psiRe[i]! * psiRe[i]!
-    }
-    const marginalSum0 = marginals0.reduce((a, b) => a + b, 0)
-    expect(marginalSum0).toBeCloseTo(totalProb)
-
-    // Marginal along axis 1 (sum over axis 0 for each column)
-    const marginals1 = [0, 0, 0, 0]
-    for (let i = 0; i < 12; i++) {
-      const col = i % 4
-      marginals1[col] = (marginals1[col] ?? 0) + psiRe[i]! * psiRe[i]!
-    }
-    const marginalSum1 = marginals1.reduce((a, b) => a + b, 0)
-    expect(marginalSum1).toBeCloseTo(totalProb)
+  it('integrates the transverse cell volume into each reported marginal density', () => {
+    const re = new Float32Array([1, 2, 0, 1, 2, 0])
+    const im = new Float32Array(6)
+    const grid = [2, 3]
+    const spacing = [0.5, 0.25]
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    expect(sampleFromMarginalDensity(re, im, grid, spacing, 0).marginalDensity).toBe(1.25)
+    expect(sampleFromMarginalDensity(re, im, grid, spacing, 1).marginalDensity).toBe(1)
   })
 
   it('selects correct axis index with deterministic RNG', () => {

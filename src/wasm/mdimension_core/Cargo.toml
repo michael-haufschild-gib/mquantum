@@ -26,7 +26,7 @@ wdw-validator = []
 [profile.release]
 opt-level = 3           # Maximum optimization for speed
 lto = "thin"            # Cross-crate gains without rust-lld memory spikes on cold wasm builds
-strip = true            # Strip debug symbols
+strip = "debuginfo"     # Retain target_features for wasm-bindgen
 codegen-units = 1       # Single codegen unit for better optimization
 panic = "abort"         # Faster panic handling
 overflow-checks = false # Skip overflow checks (we validate inputs)

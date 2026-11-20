@@ -53,7 +53,7 @@ const faviconFiles = [
 ]
 
 // ── Manual chunk assignment ────────────────────────────────────────────
-// Explicit chunk boundaries prevent Rollup from auto-assigning orphaned
+// Explicit chunk boundaries prevent Rolldown from auto-assigning orphaned
 // modules into consumer chunks, which causes circular chunk dependencies
 // and TDZ ReferenceErrors in production builds.
 //
@@ -78,6 +78,7 @@ const VENDOR_CHUNKS: [string, string][] = [
 
 /** Source path fragment → chunk name. Order matters: first match wins. */
 const SOURCE_CHUNKS: [string, string][] = [
+  ['/lib/export/mediabunny-subset', 'mediabunny'],
   // Leaf chunk — shared utils imported by both stores and physics.
   ['/lib/logger', 'core-utils'],
   ['/constants/', 'core-utils'],
@@ -231,13 +232,13 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/layout/ShortcutsOverlay', 'components-deferred'],
   // App installs shortcut handlers at startup, while ShortcutsOverlay reads
   // the same shortcut metadata lazily. Keep the shared hook in the initial UI
-  // chunk so Rollup does not pull the whole deferred overlay/export chunk into
+  // chunk so Rolldown does not pull the whole deferred overlay/export chunk into
   // the startup graph.
   ['/hooks/useKeyboardShortcuts', 'components'],
   ['/components/', 'components'],
 ]
 
-/** Assign a module to a named chunk, or undefined for Rollup auto-assignment. */
+/** Assign a module to a named chunk, or undefined for Rolldown auto-assignment. */
 function assignChunk(id: string): string | undefined {
   if (id.includes('node_modules/')) {
     for (const [pattern, chunk] of VENDOR_CHUNKS) {
@@ -251,10 +252,34 @@ function assignChunk(id: string): string | undefined {
   for (const [pattern, chunk] of SOURCE_CHUNKS) {
     if (id.includes(pattern)) return chunk
   }
-  // Remaining src/ files (lib/export, lib/url, hooks, types) are left
-  // for Rollup — they depend on stores and land in the index chunk.
+  // Let the importing group collect modules without an explicit assignment.
   return undefined
 }
+
+// Rolldown recursively collects each group's imports. Let shared libraries
+// claim their modules before the stores, renderers and UI that consume them.
+const chunkLayers = [
+  ['core-utils', 'react-vendor'],
+  [...VENDOR_CHUNKS.map(([, name]) => name), 'vendor', 'examples-styles', 'examples-scenes'],
+  ['shaders'],
+  ['shaders-schroedinger', 'rendering-compute-shared'],
+  ['physics', 'diagnostics-deferred', 'rendering-carpet'],
+  ['stores'],
+  ['rendering'],
+  ['components'],
+]
+const chunkNames = new Set([
+  'vendor',
+  ...[...VENDOR_CHUNKS, ...SOURCE_CHUNKS].map(([, name]) => name),
+])
+const chunkGroups = Array.from(chunkNames, (name) => {
+  const layer = chunkLayers.findIndex((names) => names.includes(name))
+  return {
+    name,
+    priority: layer < 0 ? 0 : chunkLayers.length - layer,
+    test: (id: string) => assignChunk(id) === name,
+  }
+})
 
 // https://vite.dev/config/
 export default defineConfig((_env) => ({
@@ -274,7 +299,8 @@ export default defineConfig((_env) => ({
     viteStaticCopy({
       targets: faviconFiles.map((file) => ({
         src: `src/assets/logo/${file}`,
-        dest: '', // Copy to dist root
+        dest: '',
+        rename: { stripBase: true },
       })),
     }),
   ],
@@ -323,13 +349,12 @@ export default defineConfig((_env) => ({
     outDir: 'dist',
     sourcemap: false,
     target: 'esnext',
-    minify: 'esbuild',
     // Wire-size budgets are enforced by scripts/check-bundle-size.js.
     // Keep Vite's uncompressed warning above intentional shader chunks.
     chunkSizeWarningLimit: 900,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: assignChunk,
+        codeSplitting: { groups: chunkGroups },
       },
     },
   },

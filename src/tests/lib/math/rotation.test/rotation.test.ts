@@ -27,6 +27,8 @@ function matrixAt(matrix: Float32Array, dim: number, row: number, col: number): 
   return matrix[row * dim + col]!
 }
 
+const FLOAT32_TOL = 1e-6
+
 describe('Rotation Operations', () => {
   describe('getRotationPlanes', () => {
     it('returns 3 planes for 3D space', () => {
@@ -131,9 +133,7 @@ describe('Rotation Operations', () => {
 
       for (let i = 0; i < 4; i++) {
         for (let j = 0; j < 4; j++) {
-          // 0 decimal places (0.5 tolerance) due to fast trig approximation (~1.2% error per call)
-          // which compounds when computing matrix products
-          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 0)
+          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 6)
         }
       }
     })
@@ -141,8 +141,7 @@ describe('Rotation Operations', () => {
     it('rotation matrix has determinant = 1', () => {
       const R = createRotationMatrix(3, 0, 1, Math.PI / 4)
       const det = determinant(R)
-      // 0 decimal places (0.5 tolerance) due to fast trig approximation
-      expect(det).toBeCloseTo(1, 0)
+      expect(det).toBeCloseTo(1, 6)
     })
 
     it('multiple rotations preserve orthogonality', () => {
@@ -156,8 +155,7 @@ describe('Rotation Operations', () => {
 
       for (let i = 0; i < 4; i++) {
         for (let j = 0; j < 4; j++) {
-          // 0 decimal places (0.5 tolerance) due to fast trig approximation
-          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 0)
+          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 6)
         }
       }
     })
@@ -189,6 +187,12 @@ describe('Rotation Operations', () => {
 
       const R = composeRotations(3, angles)
 
+      const expected = multiplyMatrices(
+        createRotationMatrix(3, 0, 1, Math.PI / 4),
+        createRotationMatrix(3, 1, 2, Math.PI / 6)
+      )
+      for (let i = 0; i < R.length; i++) expect(R[i]).toBeCloseTo(expected[i]!, 6)
+
       // Result should still be orthogonal
       const RT = transposeMatrix(R)
       const product = multiplyMatrices(R, RT)
@@ -196,13 +200,11 @@ describe('Rotation Operations', () => {
 
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          // 0 decimal places (0.5 tolerance) due to fast trig approximation
-          expect(matrixAt(product, 3, i, j)).toBeCloseTo(matrixAt(I, 3, i, j), 0)
+          expect(matrixAt(product, 3, i, j)).toBeCloseTo(matrixAt(I, 3, i, j), 6)
         }
       }
 
-      // Determinant should be 1 (0 decimal places for fast trig)
-      expect(determinant(R)).toBeCloseTo(1, 0)
+      expect(determinant(R)).toBeCloseTo(1, 6)
     })
 
     it('composes all 6 rotations in 4D', () => {
@@ -224,14 +226,11 @@ describe('Rotation Operations', () => {
 
       for (let i = 0; i < 4; i++) {
         for (let j = 0; j < 4; j++) {
-          // 0 decimal places (0.5 tolerance) due to fast trig approximation
-          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 0)
+          expect(matrixAt(product, 4, i, j)).toBeCloseTo(matrixAt(I, 4, i, j), 6)
         }
       }
 
-      // Note: Determinant check skipped for composed rotations because
-      // fast trig errors compound across 6 rotations, making the determinant
-      // deviate significantly from 1. This is acceptable for visual animations.
+      expect(determinant(R)).toBeCloseTo(1, 6)
     })
 
     it('empty rotation map returns identity', () => {
@@ -261,7 +260,7 @@ describe('Rotation Operations', () => {
       const R = createRotationMatrix(4, 0, 1, 2 * Math.PI)
       const I = createIdentityMatrix(4)
       for (let i = 0; i < 16; i++) {
-        expect(R[i]).toBeCloseTo(I[i]!, 0)
+        expect(R[i]).toBeCloseTo(I[i]!, 6)
       }
     })
 
@@ -272,7 +271,7 @@ describe('Rotation Operations', () => {
       const product = multiplyMatrices(R, Rinv)
       const I = createIdentityMatrix(4)
       for (let i = 0; i < 16; i++) {
-        expect(product[i]).toBeCloseTo(I[i]!, 0)
+        expect(product[i]).toBeCloseTo(I[i]!, 6)
       }
     })
 
@@ -283,7 +282,7 @@ describe('Rotation Operations', () => {
 
       const origMag = Math.sqrt(v.reduce((s, x) => s + x * x, 0))
       const rotMag = Math.sqrt(rotated.reduce((s, x) => s + x * x, 0))
-      expect(rotMag).toBeCloseTo(origMag, 0)
+      expect(rotMag).toBeCloseTo(origMag, 6)
     })
 
     it('rotation only affects the two axes in the rotation plane', () => {
@@ -295,9 +294,9 @@ describe('Rotation Operations', () => {
           col.push(matrixAt(R, 5, row, axis))
         }
         // Should be a standard basis vector
-        expect(col[axis]).toBeCloseTo(1, 0)
+        expect(col[axis]).toBeCloseTo(1, 6)
         for (let row = 0; row < 5; row++) {
-          if (row !== axis) expect(col[row]).toBeCloseTo(0, 0)
+          if (row !== axis) expect(col[row]).toBeCloseTo(0, 6)
         }
       }
     })
@@ -311,7 +310,7 @@ describe('Rotation Operations', () => {
       const BA = multiplyMatrices(R2, R1)
 
       for (let i = 0; i < 16; i++) {
-        expect(AB[i]).toBeCloseTo(BA[i]!, 0)
+        expect(AB[i]).toBeCloseTo(BA[i]!, 6)
       }
     })
 
@@ -404,9 +403,6 @@ describe('Rotation Operations', () => {
 
     it('rotation matrices satisfy R * R^T = Identity', () => {
       const dimensions = [3, 4, 5]
-      // Use 0.15 tolerance due to fast trig approximation (~1.2% error per trig call)
-      // which compounds when computing R * R^T
-      const FAST_TRIG_TOLERANCE = 0.15
 
       for (const dim of dimensions) {
         const angle = Math.PI / 3
@@ -418,7 +414,7 @@ describe('Rotation Operations', () => {
         for (let i = 0; i < dim; i++) {
           for (let j = 0; j < dim; j++) {
             const diff = Math.abs(matrixAt(product, dim, i, j) - matrixAt(I, dim, i, j))
-            expect(diff).toBeLessThan(FAST_TRIG_TOLERANCE)
+            expect(diff).toBeLessThan(FLOAT32_TOL)
           }
         }
       }
@@ -426,14 +422,12 @@ describe('Rotation Operations', () => {
 
     it('rotation matrices have determinant = 1', () => {
       const dimensions = [3, 4, 5]
-      // Use 0.15 tolerance due to fast trig approximation (~1.2% error per trig call)
-      const FAST_TRIG_TOLERANCE = 0.15
 
       for (const dim of dimensions) {
         const angle = Math.PI / 4
         const R = createRotationMatrix(dim, 0, 1, angle)
         const det = determinant(R)
-        expect(Math.abs(det - 1)).toBeLessThan(FAST_TRIG_TOLERANCE)
+        expect(Math.abs(det - 1)).toBeLessThan(FLOAT32_TOL)
       }
     })
   })
@@ -441,7 +435,6 @@ describe('Rotation Operations', () => {
   describe('SO(n) group properties across all supported dimensions', () => {
     // Test every dimension the app supports (3 through 11)
     const ALL_DIMS = [3, 4, 5, 6, 7, 8, 9, 10, 11]
-    const FAST_TRIG_TOLERANCE = 0.15
 
     for (const dim of ALL_DIMS) {
       it(`${dim}D: rotation matrix is orthogonal and has det = +1`, () => {
@@ -456,7 +449,7 @@ describe('Rotation Operations', () => {
         for (let r = 0; r < dim; r++) {
           for (let c = 0; c < dim; c++) {
             expect(Math.abs(matrixAt(product, dim, r, c) - matrixAt(I, dim, r, c))).toBeLessThan(
-              FAST_TRIG_TOLERANCE
+              FLOAT32_TOL
             )
           }
         }
@@ -474,7 +467,7 @@ describe('Rotation Operations', () => {
       const rhs = multiplyMatrices(A, BC) // A*(B*C)
 
       for (let i = 0; i < 16; i++) {
-        expect(lhs[i]).toBeCloseTo(rhs[i]!, 0)
+        expect(lhs[i]).toBeCloseTo(rhs[i]!, 6)
       }
     })
 
@@ -484,7 +477,7 @@ describe('Rotation Operations', () => {
       const I = createIdentityMatrix(5)
 
       for (let i = 0; i < 25; i++) {
-        expect(R2[i]).toBeCloseTo(I[i]!, 0)
+        expect(R2[i]).toBeCloseTo(I[i]!, 6)
       }
     })
 
@@ -494,9 +487,9 @@ describe('Rotation Operations', () => {
       const rotated = multiplyMatrixVector(R, v)
 
       // XY plane rotation should not touch Z, W, V components
-      expect(rotated[2]).toBeCloseTo(3.7, 0)
-      expect(rotated[3]).toBeCloseTo(-2.1, 0)
-      expect(rotated[4]).toBeCloseTo(8.4, 0)
+      expect(rotated[2]).toBeCloseTo(3.7, 6)
+      expect(rotated[3]).toBeCloseTo(-2.1, 6)
+      expect(rotated[4]).toBeCloseTo(8.4, 6)
     })
   })
 })

@@ -66,7 +66,7 @@ export function handleMeasurement(
       }
 
       if (!data) {
-        currentMeasurement.completeMeasurement([], 0, null)
+        currentMeasurement.cancelCollapse()
         return
       }
 
@@ -118,7 +118,7 @@ export function handleMeasurement(
       logger.error('[Measurement] Collapse failed:', err)
       const s = useMeasurementStore.getState()
       if (s.isCollapsing && s.collapseGeneration === collapseGeneration) {
-        s.completeMeasurement([], 0, null)
+        s.cancelCollapse()
       }
     })
 }

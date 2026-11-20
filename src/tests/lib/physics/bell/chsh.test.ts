@@ -94,6 +94,18 @@ describe('CHSH at canonical singlet angles converges to 2√2', () => {
     expect(Math.abs(S)).toBeGreaterThan(CLASSICAL_BOUND) // violation confirmed
   })
 
+  it('retains uncertainty with just one outcome per setting', () => {
+    const acc = new ChshAccumulator()
+    for (const a of [0, 1] as const) {
+      for (const b of [0, 1] as const) acc.recordTrial(a, b, 1, 1)
+    }
+    // At z=1 the Wilson limits for one +1 are [0, 1]. The three
+    // positive terms can decrease, and the subtracted term can increase S.
+    const ci = acc.getSConfidenceInterval(1)
+    expect(ci.lo).toBeCloseTo(2 - Math.sqrt(3), 12)
+    expect(ci.hi).toBeCloseTo(3, 12)
+  })
+
   it('confidence interval at 95 % covers the analytic value', () => {
     const rho = pureDensityMatrix(bellState('psiMinus'))
     const a = azimuthalVec(CANONICAL_CHSH_PHI.a)

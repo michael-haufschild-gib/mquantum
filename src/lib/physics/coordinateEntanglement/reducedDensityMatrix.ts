@@ -38,8 +38,8 @@ export function computeReducedDensityMatrix(
     const packed = computeRdmWasm(psiRe, psiIm, gridU32, targetDim)
     if (packed && packed.length === 2 * M * M) {
       return {
-        re: packed.slice(0, M * M),
-        im: packed.slice(M * M),
+        re: packed.subarray(0, M * M),
+        im: packed.subarray(M * M),
         M,
       }
     }
@@ -118,8 +118,8 @@ export function computeJointReducedDensityMatrix(
     const packed = computeJointRdmWasm(psiRe, psiIm, gridU32, keptDimsU32)
     if (packed && packed.length === 2 * Mjoint * Mjoint) {
       return {
-        re: packed.slice(0, Mjoint * Mjoint),
-        im: packed.slice(Mjoint * Mjoint),
+        re: packed.subarray(0, Mjoint * Mjoint),
+        im: packed.subarray(Mjoint * Mjoint),
         M: Mjoint,
       }
     }

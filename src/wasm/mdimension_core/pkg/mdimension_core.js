@@ -10,33 +10,36 @@
  *
  * # Returns
  * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
- * @param {Float64Array} a_re
- * @param {Float64Array} a_im
- * @param {Float64Array} b_re
- * @param {Float64Array} b_im
+ * @param {Float64Array | number[]} a_re
+ * @param {Float64Array | number[]} a_im
+ * @param {Float64Array | number[]} b_re
+ * @param {Float64Array | number[]} b_im
  * @param {number} n
  * @returns {Float64Array}
  */
 export function complex_mat_mul_wasm(a_re, a_im, b_re, b_im, n) {
+    const val5 = +n;
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArrayF64ToWasm0(b_re, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArrayF64ToWasm0(b_im, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.complex_mat_mul_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, n);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v5 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v5;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArrayF64ToWasm0(b_re, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArrayF64ToWasm0(b_im, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 8, 8); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 8, 8); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.complex_mat_mul_wasm(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, val5);
+    var v6 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v6;
 }
 
 /**
@@ -51,27 +54,29 @@ export function complex_mat_mul_wasm(a_re, a_im, b_re, b_im, n) {
  * # Returns
  * Flat rotation matrix (dimension × dimension) as Float64Array
  * @param {number} dimension
- * @param {Uint32Array} plane_indices
- * @param {Float64Array} angles
+ * @param {Uint32Array | number[]} plane_indices
+ * @param {Float64Array | number[]} angles
  * @param {number} rotation_count
  * @returns {Float64Array}
  */
 export function compose_rotations_indexed_wasm(dimension, plane_indices, angles, rotation_count) {
+    const val3 = +dimension;
+    const val4 = +rotation_count;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray32ToWasm0(plane_indices, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(angles, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.compose_rotations_indexed_wasm(retptr, dimension, ptr0, len0, ptr1, len1, rotation_count);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArray32ToWasm0(plane_indices, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compose_rotations_indexed_wasm(val3, ptr0, len0, ptr1, len1, val4);
+    var v5 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v5;
 }
 
 /**
@@ -86,25 +91,26 @@ export function compose_rotations_indexed_wasm(dimension, plane_indices, angles,
  * Flat rotation matrix (dimension × dimension) as Float64Array
  * @param {number} dimension
  * @param {string[]} plane_names
- * @param {Float64Array} angles
+ * @param {Float64Array | number[]} angles
  * @returns {Float64Array}
  */
 export function compose_rotations_wasm(dimension, plane_names, angles) {
+    const val3 = +dimension;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayJsValueToWasm0(plane_names, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(angles, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.compose_rotations_wasm(retptr, dimension, ptr0, len0, ptr1, len1);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayJsValueToWasm0(plane_names, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(angles, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__externref_drop_slice(ptr0, len0); wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compose_rotations_wasm(val3, ptr0, len0, ptr1, len1);
+    var v4 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v4;
 }
 
 /**
@@ -126,33 +132,36 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
  *
  * # Returns
  * Packed `Float32Array`, or empty on shape mismatch.
- * @param {Uint32Array} grid_size
- * @param {Float64Array} spacing
- * @param {Float64Array} center
+ * @param {Uint32Array | number[]} grid_size
+ * @param {Float64Array | number[]} spacing
+ * @param {Float64Array | number[]} center
  * @param {number} sigma
- * @param {Uint8Array} compact_dims
+ * @param {Uint8Array | number[]} compact_dims
  * @returns {Float32Array}
  */
 export function compute_full_collapse_wasm(grid_size, spacing, center, sigma, compact_dims) {
+    const val5 = +sigma;
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArrayF64ToWasm0(center, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArray8ToWasm0(compact_dims, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.compute_full_collapse_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, sigma, ptr3, len3);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v5 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v5;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArrayF64ToWasm0(center, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArray8ToWasm0(compact_dims, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 1, 1); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 8, 8); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_full_collapse_wasm(ptr0, len0, ptr1, len1, ptr2, len2, val5, ptr3, len3);
+    var v6 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v6;
 }
 
 /**
@@ -177,34 +186,38 @@ export function compute_full_collapse_wasm(grid_size, spacing, center, sigma, co
  *   - `[2N]` = total incompressible kinetic energy
  *   - `[2N+1]` = total compressible kinetic energy
  * Empty vector on invalid input.
- * @param {Float32Array} psi_re
- * @param {Float32Array} psi_im
- * @param {Uint32Array} grid_size
- * @param {Float64Array} spacing
+ * @param {Float32Array | number[]} psi_re
+ * @param {Float32Array | number[]} psi_im
+ * @param {Uint32Array | number[]} grid_size
+ * @param {Float64Array | number[]} spacing
  * @param {number} hbar
  * @param {number} mass
  * @returns {Float64Array}
  */
 export function compute_incompressible_spectrum_wasm(psi_re, psi_im, grid_size, spacing, hbar, mass) {
+    const val5 = +hbar;
+    const val6 = +mass;
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.compute_incompressible_spectrum_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, hbar, mass);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v5 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v5;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 8, 8); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_incompressible_spectrum_wasm(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, val5, val6);
+    var v7 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v7;
 }
 
 /**
@@ -219,32 +232,34 @@ export function compute_incompressible_spectrum_wasm(psi_re, psi_im, grid_size, 
  * # Returns
  * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = Π kept dims`.
  * Empty on invalid input or `M > 1024`.
- * @param {Float32Array} psi_re
- * @param {Float32Array} psi_im
- * @param {Uint32Array} grid_size
- * @param {Uint32Array} kept_dims
+ * @param {Float32Array | number[]} psi_re
+ * @param {Float32Array | number[]} psi_im
+ * @param {Uint32Array | number[]} grid_size
+ * @param {Uint32Array | number[]} kept_dims
  * @returns {Float64Array}
  */
 export function compute_joint_rdm_wasm(psi_re, psi_im, grid_size, kept_dims) {
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArray32ToWasm0(kept_dims, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.compute_joint_rdm_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v5 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v5;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArray32ToWasm0(kept_dims, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 4, 4); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_joint_rdm_wasm(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+    var v5 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v5;
 }
 
 /**
@@ -255,24 +270,17 @@ export function compute_joint_rdm_wasm(psi_re, psi_im, grid_size, kept_dims) {
  *
  * # Returns
  * Packed `Float64Array`: `[spacings..., brody_beta, mean_spacing, classification_code]`
- * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
- * @param {Float64Array} energies
+ * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson, 3 = undetermined
+ * @param {Float64Array | number[]} energies
  * @returns {Float64Array}
  */
 export function compute_level_spacing_wasm(energies) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(energies, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.compute_level_spacing_wasm(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v2 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const ptr0 = passArrayF64ToWasm0(energies, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.compute_level_spacing_wasm(ptr0, len0);
+    var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v2;
 }
 
 /**
@@ -291,10 +299,10 @@ export function compute_level_spacing_wasm(energies) {
  *
  * # Returns
  * Packed `Float32Array`, or empty on shape mismatch / invalid axis.
- * @param {Float32Array} psi_re
- * @param {Float32Array} psi_im
- * @param {Uint32Array} grid_size
- * @param {Float64Array} spacing
+ * @param {Float32Array | number[]} psi_re
+ * @param {Float32Array | number[]} psi_im
+ * @param {Uint32Array | number[]} grid_size
+ * @param {Float64Array | number[]} spacing
  * @param {number} axis
  * @param {number} axis_position
  * @param {number} sigma
@@ -302,25 +310,31 @@ export function compute_level_spacing_wasm(energies) {
  * @returns {Float32Array}
  */
 export function compute_partial_collapse_wasm(psi_re, psi_im, grid_size, spacing, axis, axis_position, sigma, axis_compact) {
+    const val5 = +axis;
+    const val6 = +axis_position;
+    const val7 = +sigma;
+    const val8 = +axis_compact;
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        wasm.compute_partial_collapse_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, axis, axis_position, sigma, axis_compact);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v5 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v5;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 8, 8); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_partial_collapse_wasm(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, val5, val6, val7, val8);
+    var v9 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v9;
 }
 
 /**
@@ -336,30 +350,32 @@ export function compute_partial_collapse_wasm(psi_re, psi_im, grid_size, spacing
  * # Returns
  * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = grid_size[dim_index]`.
  * Empty on invalid input.
- * @param {Float32Array} psi_re
- * @param {Float32Array} psi_im
- * @param {Uint32Array} grid_size
+ * @param {Float32Array | number[]} psi_re
+ * @param {Float32Array | number[]} psi_im
+ * @param {Uint32Array | number[]} grid_size
  * @param {number} dim_index
  * @returns {Float64Array}
  */
 export function compute_rdm_wasm(psi_re, psi_im, grid_size, dim_index) {
+    const val4 = +dim_index;
+    let ptr0, len0, ptr1, len1, ptr2, len2;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        wasm.compute_rdm_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, dim_index);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v4 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v4;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_rdm_wasm(ptr0, len0, ptr1, len1, ptr2, len2, val4);
+    var v5 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v5;
 }
 
 /**
@@ -377,40 +393,46 @@ export function compute_rdm_wasm(psi_re, psi_im, grid_size, dim_index) {
  *
  * # Returns
  * Packed `Float64Array`: `[corr_0, ..., corr_N, max, mean, orbit_correlation, strongest_idx]`
- * @param {Float32Array} density_re
- * @param {Float32Array} density_im
- * @param {Uint32Array} grid_sizes
- * @param {Float64Array} spacings
- * @param {Float64Array} orbit_points_flat
- * @param {Uint32Array} orbit_lengths
+ * @param {Float32Array | number[]} density_re
+ * @param {Float32Array | number[]} density_im
+ * @param {Uint32Array | number[]} grid_sizes
+ * @param {Float64Array | number[]} spacings
+ * @param {Float64Array | number[]} orbit_points_flat
+ * @param {Uint32Array | number[]} orbit_lengths
  * @param {number} sigma
  * @param {number} dim
  * @returns {Float64Array}
  */
 export function compute_scar_correlation_wasm(density_re, density_im, grid_sizes, spacings, orbit_points_flat, orbit_lengths, sigma, dim) {
+    const val7 = +sigma;
+    const val8 = +dim;
+    let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF32ToWasm0(density_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(density_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(grid_sizes, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArrayF64ToWasm0(spacings, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        const ptr4 = passArrayF64ToWasm0(orbit_points_flat, wasm.__wbindgen_export);
-        const len4 = WASM_VECTOR_LEN;
-        const ptr5 = passArray32ToWasm0(orbit_lengths, wasm.__wbindgen_export);
-        const len5 = WASM_VECTOR_LEN;
-        wasm.compute_scar_correlation_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, sigma, dim);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v7 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v7;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF32ToWasm0(density_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF32ToWasm0(density_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray32ToWasm0(grid_sizes, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passArrayF64ToWasm0(spacings, wasm.__wbindgen_malloc);
+        len3 = WASM_VECTOR_LEN;
+        ptr4 = passArrayF64ToWasm0(orbit_points_flat, wasm.__wbindgen_malloc);
+        len4 = WASM_VECTOR_LEN;
+        ptr5 = passArray32ToWasm0(orbit_lengths, wasm.__wbindgen_malloc);
+        len5 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr5) { wasm.__wbindgen_free(ptr5, len5 * 4, 4); }
+        if (ptr4) { wasm.__wbindgen_free(ptr4, len4 * 8, 8); }
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 8, 8); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
     }
+    const ret = wasm.compute_scar_correlation_wasm(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, val7, val8);
+    var v9 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v9;
 }
 
 /**
@@ -432,15 +454,22 @@ export function dirac_spinor_size_wasm(spatial_dim) {
  *
  * # Returns
  * The scalar dot product
- * @param {Float64Array} a
- * @param {Float64Array} b
+ * @param {Float64Array | number[]} a
+ * @param {Float64Array | number[]} b
  * @returns {number}
  */
 export function dot_product_wasm(a, b) {
-    const ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_export);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_export);
-    const len1 = WASM_VECTOR_LEN;
+    let ptr0, len0, ptr1, len1;
+    try {
+        ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
+    }
     const ret = wasm.dot_product_wasm(ptr0, len0, ptr1, len1);
     return ret;
 }
@@ -456,24 +485,18 @@ export function dot_product_wasm(a, b) {
  *
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
- * @param {Float64Array} data
+ * @param {Float64Array | number[]} data
  * @param {number} n
  * @returns {Float64Array}
  */
 export function fft_1d_wasm(data, n) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.fft_1d_wasm(retptr, ptr0, len0, n);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v2 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const val2 = +n;
+    const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.fft_1d_wasm(ptr0, len0, val2);
+    var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v3;
 }
 
 /**
@@ -487,26 +510,26 @@ export function fft_1d_wasm(data, n) {
  *
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
- * @param {Float64Array} data
- * @param {Uint32Array} grid_size
+ * @param {Float64Array | number[]} data
+ * @param {Uint32Array | number[]} grid_size
  * @returns {Float64Array}
  */
 export function fft_nd_wasm(data, grid_size) {
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.fft_nd_wasm(retptr, ptr0, len0, ptr1, len1);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.fft_nd_wasm(ptr0, len0, ptr1, len1);
+    var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v3;
 }
 
 /**
@@ -523,17 +546,10 @@ export function fft_nd_wasm(data, grid_size) {
  * @returns {Float32Array}
  */
 export function generate_dirac_matrices_wasm(spatial_dim) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.generate_dirac_matrices_wasm(retptr, spatial_dim);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v1 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v1;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const ret = wasm.generate_dirac_matrices_wasm(spatial_dim);
+    var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v1;
 }
 
 /**
@@ -553,17 +569,10 @@ export function generate_dirac_matrices_wasm(spatial_dim) {
  * @returns {Float32Array}
  */
 export function generate_disorder_noise_wasm(total_sites, seed) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.generate_disorder_noise_wasm(retptr, total_sites, seed);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v1 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v1;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const ret = wasm.generate_disorder_noise_wasm(total_sites, seed);
+    var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v1;
 }
 
 /**
@@ -587,17 +596,10 @@ export function generate_disorder_noise_wasm(total_sites, seed) {
  * @returns {Float32Array}
  */
 export function generate_disorder_potential_wasm(total_sites, disorder_strength, seed, distribution_code) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.generate_disorder_potential_wasm(retptr, total_sites, disorder_strength, seed, distribution_code);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v1 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v1;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const ret = wasm.generate_disorder_potential_wasm(total_sites, disorder_strength, seed, distribution_code);
+    var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v1;
 }
 
 /**
@@ -610,27 +612,28 @@ export function generate_disorder_potential_wasm(total_sites, disorder_strength,
  *
  * # Returns
  * Eigenvalues sorted descending as `Float64Array`
- * @param {Float64Array} re
- * @param {Float64Array} im
+ * @param {Float64Array | number[]} re
+ * @param {Float64Array | number[]} im
  * @param {number} n
  * @returns {Float64Array}
  */
 export function hermitian_eigenvalues_wasm(re, im, n) {
+    const val3 = +n;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.hermitian_eigenvalues_wasm(retptr, ptr0, len0, ptr1, len1, n);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.hermitian_eigenvalues_wasm(ptr0, len0, ptr1, len1, val3);
+    var v4 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v4;
 }
 
 /**
@@ -644,24 +647,18 @@ export function hermitian_eigenvalues_wasm(re, im, n) {
  *
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
- * @param {Float64Array} data
+ * @param {Float64Array | number[]} data
  * @param {number} n
  * @returns {Float64Array}
  */
 export function ifft_1d_wasm(data, n) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.ifft_1d_wasm(retptr, ptr0, len0, n);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v2 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const val2 = +n;
+    const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.ifft_1d_wasm(ptr0, len0, val2);
+    var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v3;
 }
 
 /**
@@ -675,26 +672,26 @@ export function ifft_1d_wasm(data, n) {
  *
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
- * @param {Float64Array} data
- * @param {Uint32Array} grid_size
+ * @param {Float64Array | number[]} data
+ * @param {Uint32Array | number[]} grid_size
  * @returns {Float64Array}
  */
 export function ifft_nd_wasm(data, grid_size) {
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.ifft_nd_wasm(retptr, ptr0, len0, ptr1, len1);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.ifft_nd_wasm(ptr0, len0, ptr1, len1);
+    var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v3;
 }
 
 /**
@@ -705,11 +702,11 @@ export function ifft_nd_wasm(data, grid_size) {
  *
  * # Returns
  * The magnitude of the vector
- * @param {Float64Array} v
+ * @param {Float64Array | number[]} v
  * @returns {number}
  */
 export function magnitude_wasm(v) {
-    const ptr0 = passArrayF64ToWasm0(v, wasm.__wbindgen_export);
+    const ptr0 = passArrayF64ToWasm0(v, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.magnitude_wasm(ptr0, len0);
     return ret;
@@ -727,27 +724,28 @@ export function magnitude_wasm(v) {
  *
  * # Returns
  * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
- * @param {Float64Array} a_re
- * @param {Float64Array} a_im
+ * @param {Float64Array | number[]} a_re
+ * @param {Float64Array | number[]} a_im
  * @param {number} n
  * @returns {Float64Array}
  */
 export function matrix_exponential_pade_wasm(a_re, a_im, n) {
+    const val3 = +n;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.matrix_exponential_pade_wasm(retptr, ptr0, len0, ptr1, len1, n);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.matrix_exponential_pade_wasm(ptr0, len0, ptr1, len1, val3);
+    var v4 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v4;
 }
 
 /**
@@ -760,27 +758,28 @@ export function matrix_exponential_pade_wasm(a_re, a_im, n) {
  *
  * # Returns
  * Result matrix (n×n, row-major)
- * @param {Float64Array} a
- * @param {Float64Array} b
+ * @param {Float64Array | number[]} a
+ * @param {Float64Array | number[]} b
  * @param {number} dimension
  * @returns {Float64Array}
  */
 export function multiply_matrices_wasm(a, b, dimension) {
+    const val3 = +dimension;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.multiply_matrices_wasm(retptr, ptr0, len0, ptr1, len1, dimension);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.multiply_matrices_wasm(ptr0, len0, ptr1, len1, val3);
+    var v4 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v4;
 }
 
 /**
@@ -793,27 +792,28 @@ export function multiply_matrices_wasm(a, b, dimension) {
  *
  * # Returns
  * Result vector of length n
- * @param {Float64Array} matrix
- * @param {Float64Array} vector
+ * @param {Float64Array | number[]} matrix
+ * @param {Float64Array | number[]} vector
  * @param {number} dimension
  * @returns {Float64Array}
  */
 export function multiply_matrix_vector_wasm(matrix, vector, dimension) {
+    const val3 = +dimension;
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(matrix, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(vector, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.multiply_matrix_vector_wasm(retptr, ptr0, len0, ptr1, len1, dimension);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(matrix, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(vector, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.multiply_matrix_vector_wasm(ptr0, len0, ptr1, len1, val3);
+    var v4 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v4;
 }
 
 /**
@@ -824,23 +824,16 @@ export function multiply_matrix_vector_wasm(matrix, vector, dimension) {
  *
  * # Returns
  * Unit vector in the same direction
- * @param {Float64Array} v
+ * @param {Float64Array | number[]} v
  * @returns {Float64Array}
  */
 export function normalize_vector_wasm(v) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(v, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.normalize_vector_wasm(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v2 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const ptr0 = passArrayF64ToWasm0(v, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.normalize_vector_wasm(ptr0, len0);
+    var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v2;
 }
 
 /**
@@ -853,25 +846,20 @@ export function normalize_vector_wasm(v) {
  *
  * # Returns
  * Flat array of 3D positions as Float32Array [x0, y0, z0, x1, y1, z1, ...]
- * @param {Float64Array} flat_vertices
+ * @param {Float64Array | number[]} flat_vertices
  * @param {number} dimension
  * @param {number} projection_distance
  * @returns {Float32Array}
  */
 export function project_vertices_wasm(flat_vertices, dimension, projection_distance) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(flat_vertices, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.project_vertices_wasm(retptr, ptr0, len0, dimension, projection_distance);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v2 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    const val2 = +dimension;
+    const val3 = +projection_distance;
+    const ptr0 = passArrayF64ToWasm0(flat_vertices, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.project_vertices_wasm(ptr0, len0, val2, val3);
+    var v4 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v4;
 }
 
 /**
@@ -891,26 +879,26 @@ export function start() {
  *
  * # Returns
  * The difference vector
- * @param {Float64Array} a
- * @param {Float64Array} b
+ * @param {Float64Array | number[]} a
+ * @param {Float64Array | number[]} b
  * @returns {Float64Array}
  */
 export function subtract_vectors_wasm(a, b) {
+    let ptr0, len0, ptr1, len1;
     try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.subtract_vectors_wasm(retptr, ptr0, len0, ptr1, len1);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF64FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 8, 8);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
+        ptr0 = passArrayF64ToWasm0(a, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(b, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 8, 8); }
+        throw e;
     }
+    const ret = wasm.subtract_vectors_wasm(ptr0, len0, ptr1, len1);
+    var v3 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v3;
 }
 
 /**
@@ -921,11 +909,11 @@ export function subtract_vectors_wasm(a, b) {
  *
  * # Returns
  * Entropy value (natural log, nats), clamped to >= 0
- * @param {Float64Array} eigenvalues
+ * @param {Float64Array | number[]} eigenvalues
  * @returns {number}
  */
 export function von_neumann_entropy_wasm(eigenvalues) {
-    const ptr0 = passArrayF64ToWasm0(eigenvalues, wasm.__wbindgen_export);
+    const ptr0 = passArrayF64ToWasm0(eigenvalues, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.von_neumann_entropy_wasm(ptr0, len0);
     return ret;
@@ -933,15 +921,15 @@ export function von_neumann_entropy_wasm(eigenvalues) {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_string_get_92ab86bb19cbc12f: function(arg0, arg1) {
-            const obj = getObject(arg1);
+        __wbg___wbindgen_string_get_7ce8eee7fd327545: function(arg0, arg1) {
+            const obj = arg1;
             const ret = typeof(obj) === 'string' ? obj : undefined;
-            var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             var len1 = WASM_VECTOR_LEN;
-            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 0, ptr1, true);
         },
-        __wbg___wbindgen_throw_5d9e815e6fdf150f: function(arg0, arg1) {
+        __wbg___wbindgen_throw_4c88d8bf264fd984: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
         __wbg_error_757e9472f8410341: function(arg0, arg1) {
@@ -952,25 +940,30 @@ function __wbg_get_imports() {
                 deferred0_1 = arg1;
                 console.error(getStringFromWasm0(arg0, arg1));
             } finally {
-                wasm.__wbindgen_export3(deferred0_0, deferred0_1, 1);
+                wasm.__wbindgen_free(deferred0_0, deferred0_1, 1);
             }
         },
         __wbg_log_00952405221549ca: function(arg0, arg1) {
             console.log(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_new_227d7c05414eb861: function() {
+        __wbg_new_bb74001155cb8ca8: function() {
             const ret = new Error();
-            return addHeapObject(ret);
+            return ret;
         },
-        __wbg_stack_3b0d974bbf31e44f: function(arg0, arg1) {
-            const ret = getObject(arg1).stack;
-            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        __wbg_stack_575c4e0918581b9c: function(arg0, arg1) {
+            const ret = arg1.stack;
+            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len1 = WASM_VECTOR_LEN;
-            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 0, ptr1, true);
         },
-        __wbindgen_object_drop_ref: function(arg0) {
-            takeObject(arg0);
+        __wbindgen_init_externref_table: function() {
+            const table = wasm.__wbindgen_externrefs;
+            table.set(0, undefined);
+            table.set(1024, undefined);
+            table.set(1025, null);
+            table.set(1026, true);
+            table.set(1027, false);
         },
     };
     return {
@@ -979,19 +972,10 @@ function __wbg_get_imports() {
     };
 }
 
-function addHeapObject(obj) {
-    if (heap_next === heap.length) heap.push(heap.length + 1);
-    const idx = heap_next;
-    heap_next = heap[idx];
-
-    heap[idx] = obj;
+function addToExternrefTable0(obj) {
+    const idx = wasm.__externref_table_alloc();
+    wasm.__wbindgen_externrefs.set(idx, obj);
     return idx;
-}
-
-function dropObject(idx) {
-    if (idx < 1028) return;
-    heap[idx] = heap_next;
-    heap_next = idx;
 }
 
 function getArrayF32FromWasm0(ptr, len) {
@@ -1029,7 +1013,8 @@ function getFloat64ArrayMemory0() {
 }
 
 function getStringFromWasm0(ptr, len) {
-    return decodeText(ptr >>> 0, len);
+    ptr = ptr >>> 0;
+    return decodeText(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
 let cachedUint32ArrayMemory0 = null;
@@ -1047,13 +1032,6 @@ function getUint8ArrayMemory0() {
     }
     return cachedUint8ArrayMemory0;
 }
-
-function getObject(idx) { return heap[idx]; }
-
-let heap = new Array(1024).fill(undefined);
-heap.push(undefined, null, true, false);
-
-let heap_next = heap.length;
 
 function isLikeNone(x) {
     return x === undefined || x === null;
@@ -1089,9 +1067,9 @@ function passArrayF64ToWasm0(arg, malloc) {
 
 function passArrayJsValueToWasm0(array, malloc) {
     const ptr = malloc(array.length * 4, 4) >>> 0;
-    const mem = getDataViewMemory0();
     for (let i = 0; i < array.length; i++) {
-        mem.setUint32(ptr + 4 * i, addHeapObject(array[i]), true);
+        const add = addToExternrefTable0(array[i]);
+        getDataViewMemory0().setUint32(ptr + 4 * i, add, true);
     }
     WASM_VECTOR_LEN = array.length;
     return ptr;
@@ -1134,24 +1112,18 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 
-function takeObject(idx) {
-    const ret = getObject(idx);
-    dropObject(idx);
-    return ret;
-}
-
-let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
 cachedTextDecoder.decode();
 const MAX_SAFARI_DECODE_BYTES = 2146435072;
 let numBytesDecoded = 0;
-function decodeText(ptr, len) {
-    numBytesDecoded += len;
+function decodeText(bytes) {
+    numBytesDecoded += bytes.length;
     if (numBytesDecoded >= MAX_SAFARI_DECODE_BYTES) {
-        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
         cachedTextDecoder.decode();
-        numBytesDecoded = len;
+        numBytesDecoded = bytes.length;
     }
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+    return cachedTextDecoder.decode(bytes);
 }
 
 const cachedTextEncoder = new TextEncoder();
@@ -1242,9 +1214,17 @@ function initSync(module) {
     return __wbg_finalize_init(instance, module);
 }
 
+let __wbg_init_promise;
 async function __wbg_init(module_or_path) {
     if (wasm !== undefined) return wasm;
+    if (__wbg_init_promise === undefined) {
+        __wbg_init_promise = __wbg_init_once(module_or_path);
+        __wbg_init_promise.catch(() => { __wbg_init_promise = undefined; });
+    }
+    return __wbg_init_promise;
+}
 
+async function __wbg_init_once(module_or_path) {
 
     if (module_or_path !== undefined) {
         if (Object.getPrototypeOf(module_or_path) === Object.prototype) {

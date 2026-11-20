@@ -26,7 +26,7 @@ const HEATMAP_SIZE = 120
 
 /* ── Per-Dimension Bars ── */
 
-/** Horizontal bar chart of S_d / log(M_d) for each dimension. */
+/** Horizontal bar chart of S_d / S_max for each dimension. */
 export const PerDimensionBars: React.FC<{
   entropies: (number | null)[]
   maxEntropies: (number | null)[]

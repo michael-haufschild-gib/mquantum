@@ -6,10 +6,12 @@ Developer onboarding for the mquantum codebase. This guide gets you from `git cl
 
 | Requirement | Version | Check |
 |-------------|---------|-------|
-| Node.js | >= 24 | `node --version` |
-| pnpm | >= 10 | `pnpm --version` |
+| Node.js | 24.15+ (24.x) or 26+ | `node --version` |
+| pnpm | >= 12 | `pnpm --version` |
 | Chrome/Chromium | >= 113 with WebGPU | `chrome://gpu` shows "WebGPU: Hardware accelerated" |
 | Rust + wasm-pack | Latest stable | Only needed for WASM rebuilds; pre-built binary is committed |
+
+Builds use the TypeScript 7 compiler. ESLint uses the TypeScript 6 compatibility API.
 
 Safari is not supported (WGSL compiler hangs on deep nested loops).
 
@@ -17,10 +19,16 @@ Safari is not supported (WGSL compiler hangs on deep nested loops).
 
 ```bash
 pnpm install --frozen-lockfile   # Install dependencies (uses lockfile)
-pnpm run dev                     # Starts Vite through Portless
 ```
 
-The app opens at `https://mquantum.localhost`. Portless assigns Vite an internal free port, so concurrent project dev servers do not collide. First run may prompt for local CA trust because Portless serves HTTPS by default.
+On macOS, start a loopback-only HTTPS proxy without sudo and trust its local CA once:
+
+```bash
+pnpm exec portless proxy start --unprivileged --https
+pnpm exec portless trust
+```
+
+Run `pnpm dev` to start Vite through Portless. The app opens at `https://mquantum.localhost`. Portless assigns Vite an internal free port, so concurrent project dev servers do not collide. First run may prompt for local CA trust because Portless serves HTTPS by default.
 
 ## Project Layout
 

@@ -148,7 +148,7 @@ function installPopoverMock(): void {
       return popoverOpenState.get(this) ?? false
     }
     return originalMatches.call(this, selector)
-  }
+  } as typeof originalMatches
 }
 
 // =============================================================================

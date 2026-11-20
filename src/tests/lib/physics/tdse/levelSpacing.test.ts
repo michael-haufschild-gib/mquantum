@@ -64,31 +64,35 @@ describe('computeLevelSpacing', () => {
     expect(result.meanSpacing).toBe(1)
   })
 
-  it('classifies fully degenerate spectra as poisson', () => {
+  it('leaves fully degenerate spectra unclassified', () => {
     const result = computeLevelSpacing(Array.from({ length: 20 }, () => 1.5))
     expect(result.spacings).toEqual(Array.from({ length: 19 }, () => 0))
     expect(result.meanSpacing).toBe(0)
-    expect(result.brodyBeta).toBe(0)
-    expect(result.classification).toBe('poisson')
+    expect(result.brodyBeta).toBeNaN()
+    expect(result.classification).toBe('undetermined')
   })
 
-  it('falls back to finite poisson metadata when finite energies produce overflowed spacings', () => {
+  it('unfolds finite gaps even when their sum overflows', () => {
     const result = computeLevelSpacing([-Number.MAX_VALUE, 0, Number.MAX_VALUE])
-
-    expect(result.energies).toEqual([-Number.MAX_VALUE, 0, Number.MAX_VALUE])
-    expect(result.spacings).toEqual([Number.MAX_VALUE, Number.MAX_VALUE])
-    expect(result.meanSpacing).toBe(0)
-    expect(result.brodyBeta).toBe(0)
-    expect(result.classification).toBe('poisson')
+    expect(result.spacings).toEqual([1, 1])
+    expect(result.meanSpacing).toBe(Number.MAX_VALUE)
+    const wide = computeLevelSpacing([-Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE])
+    expect(wide.meanSpacing).toBe(Number.MAX_VALUE)
+    expect(wide.spacings).toEqual([2, 0])
+    expect(computeLevelSpacing([0, 0, Number.MIN_VALUE]).spacings).toEqual([0, 2])
   })
 
-  it('returns finite empty metadata when fewer than two finite energies remain', () => {
+  it('fits both edges of each empirical CDF jump', () => {
+    expect(computeLevelSpacing([0, 0.8, 2]).brodyBeta).toBeGreaterThan(0.99)
+  })
+
+  it('leaves the fit undefined when fewer than two finite energies remain', () => {
     const result = computeLevelSpacing([Number.NaN, Number.POSITIVE_INFINITY], [0.1, Number.NaN])
     expect(result.energies).toEqual([])
     expect(result.spacings).toEqual([])
     expect(result.meanSpacing).toBe(0)
-    expect(result.brodyBeta).toBe(0)
-    expect(result.classification).toBe('poisson')
+    expect(result.brodyBeta).toBeNaN()
+    expect(result.classification).toBe('undetermined')
     expect(result.meanIPR).toBeNaN()
   })
 

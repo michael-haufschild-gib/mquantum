@@ -30,7 +30,6 @@ vi.mock('@/components/sections/Analysis/useAtlasSweepController', () => ({
 }))
 
 vi.mock('@/components/sections/Analysis/QuantumnessAtlasVisualizations', () => ({
-  DIAG_COLORS: { entanglement: '#fff', wigner: '#fff', ipr: '#fff' },
   DiagnosticScatter: () => <div data-testid="diagnostic-scatter" />,
   DimensionComparison: () => <div data-testid="dimension-comparison" />,
   ErosionCurves: () => <div data-testid="erosion-curves" />,

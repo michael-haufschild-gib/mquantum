@@ -29,18 +29,7 @@ export default defineConfig({
     // pays a large setup cost; `threads` uses worker_threads that share the
     // host heap, so module graph and transform cache hits are near-free.
     pool: 'threads',
-    // minWorkers keeps a warm pool so file-level parallelism doesn't pay
-    // thread spin-up on every run. maxWorkers stays at min(8, cpus) so big
-    // dev boxes get the perf gain but small CI runners don't oversubscribe.
-    minWorkers: Math.min(4, MAX_WORKERS),
     maxWorkers: MAX_WORKERS,
-    // Pure logic tests (no DOM) run in node environment — skips happy-dom init
-    environmentMatchGlobs: [
-      ['src/tests/lib/**', 'node'],
-      ['src/tests/stores/**', 'node'],
-      ['src/tests/wasm/**', 'node'],
-      ['src/tests/rendering/**', 'node'],
-    ],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
@@ -49,7 +38,7 @@ export default defineConfig({
       // Underscore-prefixed research diagnostics (one-shot scans, live
       // investigations, publication CSV dumps): skipped by default so
       // `pnpm test` stays regression-focused. Run explicitly via
-      // `pnpm exec vitest run src/tests/.../_<name>.test.ts`.
+      // `pnpm exec vitest run --config vitest.oneshot.config.ts <path>`.
       '**/_*.test.ts',
     ],
     // Benchmarks live in `<name>.bench/index.ts` folders (folder-boundary

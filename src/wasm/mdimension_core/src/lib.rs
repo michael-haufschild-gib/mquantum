@@ -512,11 +512,9 @@ pub fn matrix_exponential_pade_wasm(a_re: &[f64], a_im: &[f64], n: u32) -> Vec<f
     if a_re.len() < size || a_im.len() < size {
         return Vec::new();
     }
-    let (res_re, res_im) = complex_matrix::matrix_exponential_pade(a_re, a_im, n);
-    let mut packed = Vec::with_capacity(2 * size);
-    packed.extend_from_slice(&res_re[..size]);
-    packed.extend_from_slice(&res_im[..size]);
-    packed
+    let (mut re, im) = complex_matrix::matrix_exponential_pade(a_re, a_im, n);
+    re.extend(im);
+    re
 }
 
 /// Complex matrix multiply: C = A × B for N×N matrices.
@@ -727,7 +725,7 @@ pub fn compute_partial_collapse_wasm(
 ///
 /// # Returns
 /// Packed `Float64Array`: `[spacings..., brody_beta, mean_spacing, classification_code]`
-/// Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
+/// Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson, 3 = undetermined
 #[wasm_bindgen]
 pub fn compute_level_spacing_wasm(energies: &[f64]) -> Vec<f64> {
     tdse_diagnostics::compute_level_spacing(energies)

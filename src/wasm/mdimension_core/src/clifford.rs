@@ -336,11 +336,7 @@ pub fn verify_clifford_algebra(alphas: &[ComplexMatrix], beta: &ComplexMatrix, s
 
     // Check β² = I
     let b2 = complex_mat_mul(beta, beta, s);
-    if !matrices_close(&b2, &id, tol) {
-        return false;
-    }
-
-    true
+    matrices_close(&b2, &id, tol)
 }
 
 #[cfg(any(test, debug_assertions))]

@@ -12,7 +12,7 @@
  * # Returns
  * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
  */
-export function complex_mat_mul_wasm(a_re: Float64Array, a_im: Float64Array, b_re: Float64Array, b_im: Float64Array, n: number): Float64Array;
+export function complex_mat_mul_wasm(a_re: Float64Array | number[], a_im: Float64Array | number[], b_re: Float64Array | number[], b_im: Float64Array | number[], n: number): Float64Array;
 
 /**
  * Composes multiple rotations from flattened plane indices and angles.
@@ -26,7 +26,7 @@ export function complex_mat_mul_wasm(a_re: Float64Array, a_im: Float64Array, b_r
  * # Returns
  * Flat rotation matrix (dimension × dimension) as Float64Array
  */
-export function compose_rotations_indexed_wasm(dimension: number, plane_indices: Uint32Array, angles: Float64Array, rotation_count: number): Float64Array;
+export function compose_rotations_indexed_wasm(dimension: number, plane_indices: Uint32Array | number[], angles: Float64Array | number[], rotation_count: number): Float64Array;
 
 /**
  * Composes multiple rotations from plane names and angles.
@@ -39,7 +39,7 @@ export function compose_rotations_indexed_wasm(dimension: number, plane_indices:
  * # Returns
  * Flat rotation matrix (dimension × dimension) as Float64Array
  */
-export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array): Float64Array;
+export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array | number[]): Float64Array;
 
 /**
  * Full Gaussian measurement collapse.
@@ -61,7 +61,7 @@ export function compose_rotations_wasm(dimension: number, plane_names: string[],
  * # Returns
  * Packed `Float32Array`, or empty on shape mismatch.
  */
-export function compute_full_collapse_wasm(grid_size: Uint32Array, spacing: Float64Array, center: Float64Array, sigma: number, compact_dims: Uint8Array): Float32Array;
+export function compute_full_collapse_wasm(grid_size: Uint32Array | number[], spacing: Float64Array | number[], center: Float64Array | number[], sigma: number, compact_dims: Uint8Array | number[]): Float32Array;
 
 /**
  * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
@@ -86,7 +86,7 @@ export function compute_full_collapse_wasm(grid_size: Uint32Array, spacing: Floa
  *   - `[2N+1]` = total compressible kinetic energy
  * Empty vector on invalid input.
  */
-export function compute_incompressible_spectrum_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, spacing: Float64Array, hbar: number, mass: number): Float64Array;
+export function compute_incompressible_spectrum_wasm(psi_re: Float32Array | number[], psi_im: Float32Array | number[], grid_size: Uint32Array | number[], spacing: Float64Array | number[], hbar: number, mass: number): Float64Array;
 
 /**
  * Compute the joint reduced density matrix for a set of dimensions.
@@ -101,7 +101,7 @@ export function compute_incompressible_spectrum_wasm(psi_re: Float32Array, psi_i
  * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = Π kept dims`.
  * Empty on invalid input or `M > 1024`.
  */
-export function compute_joint_rdm_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, kept_dims: Uint32Array): Float64Array;
+export function compute_joint_rdm_wasm(psi_re: Float32Array | number[], psi_im: Float32Array | number[], grid_size: Uint32Array | number[], kept_dims: Uint32Array | number[]): Float64Array;
 
 /**
  * Compute level spacing statistics from energy eigenvalues.
@@ -111,9 +111,9 @@ export function compute_joint_rdm_wasm(psi_re: Float32Array, psi_im: Float32Arra
  *
  * # Returns
  * Packed `Float64Array`: `[spacings..., brody_beta, mean_spacing, classification_code]`
- * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
+ * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson, 3 = undetermined
  */
-export function compute_level_spacing_wasm(energies: Float64Array): Float64Array;
+export function compute_level_spacing_wasm(energies: Float64Array | number[]): Float64Array;
 
 /**
  * Partial axis-aligned measurement collapse.
@@ -132,7 +132,7 @@ export function compute_level_spacing_wasm(energies: Float64Array): Float64Array
  * # Returns
  * Packed `Float32Array`, or empty on shape mismatch / invalid axis.
  */
-export function compute_partial_collapse_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, spacing: Float64Array, axis: number, axis_position: number, sigma: number, axis_compact: number): Float32Array;
+export function compute_partial_collapse_wasm(psi_re: Float32Array | number[], psi_im: Float32Array | number[], grid_size: Uint32Array | number[], spacing: Float64Array | number[], axis: number, axis_position: number, sigma: number, axis_compact: number): Float32Array;
 
 /**
  * Compute the reduced density matrix for a single dimension by tracing out
@@ -148,7 +148,7 @@ export function compute_partial_collapse_wasm(psi_re: Float32Array, psi_im: Floa
  * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = grid_size[dim_index]`.
  * Empty on invalid input.
  */
-export function compute_rdm_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, dim_index: number): Float64Array;
+export function compute_rdm_wasm(psi_re: Float32Array | number[], psi_im: Float32Array | number[], grid_size: Uint32Array | number[], dim_index: number): Float64Array;
 
 /**
  * Compute scar correlation between eigenstate density and classical orbits.
@@ -166,7 +166,7 @@ export function compute_rdm_wasm(psi_re: Float32Array, psi_im: Float32Array, gri
  * # Returns
  * Packed `Float64Array`: `[corr_0, ..., corr_N, max, mean, orbit_correlation, strongest_idx]`
  */
-export function compute_scar_correlation_wasm(density_re: Float32Array, density_im: Float32Array, grid_sizes: Uint32Array, spacings: Float64Array, orbit_points_flat: Float64Array, orbit_lengths: Uint32Array, sigma: number, dim: number): Float64Array;
+export function compute_scar_correlation_wasm(density_re: Float32Array | number[], density_im: Float32Array | number[], grid_sizes: Uint32Array | number[], spacings: Float64Array | number[], orbit_points_flat: Float64Array | number[], orbit_lengths: Uint32Array | number[], sigma: number, dim: number): Float64Array;
 
 /**
  * Returns the spinor size for a given spatial dimension.
@@ -183,7 +183,7 @@ export function dirac_spinor_size_wasm(spatial_dim: number): number;
  * # Returns
  * The scalar dot product
  */
-export function dot_product_wasm(a: Float64Array, b: Float64Array): number;
+export function dot_product_wasm(a: Float64Array | number[], b: Float64Array | number[]): number;
 
 /**
  * In-place 1D forward FFT on interleaved complex data.
@@ -197,7 +197,7 @@ export function dot_product_wasm(a: Float64Array, b: Float64Array): number;
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
  */
-export function fft_1d_wasm(data: Float64Array, n: number): Float64Array;
+export function fft_1d_wasm(data: Float64Array | number[], n: number): Float64Array;
 
 /**
  * N-dimensional forward FFT on interleaved complex data.
@@ -211,7 +211,7 @@ export function fft_1d_wasm(data: Float64Array, n: number): Float64Array;
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
  */
-export function fft_nd_wasm(data: Float64Array, grid_size: Uint32Array): Float64Array;
+export function fft_nd_wasm(data: Float64Array | number[], grid_size: Uint32Array | number[]): Float64Array;
 
 /**
  * Generates Dirac gamma matrices for N spatial dimensions.
@@ -269,7 +269,7 @@ export function generate_disorder_potential_wasm(total_sites: number, disorder_s
  * # Returns
  * Eigenvalues sorted descending as `Float64Array`
  */
-export function hermitian_eigenvalues_wasm(re: Float64Array, im: Float64Array, n: number): Float64Array;
+export function hermitian_eigenvalues_wasm(re: Float64Array | number[], im: Float64Array | number[], n: number): Float64Array;
 
 /**
  * In-place 1D inverse FFT with 1/N normalization.
@@ -283,7 +283,7 @@ export function hermitian_eigenvalues_wasm(re: Float64Array, im: Float64Array, n
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
  */
-export function ifft_1d_wasm(data: Float64Array, n: number): Float64Array;
+export function ifft_1d_wasm(data: Float64Array | number[], n: number): Float64Array;
 
 /**
  * N-dimensional inverse FFT on interleaved complex data.
@@ -297,7 +297,7 @@ export function ifft_1d_wasm(data: Float64Array, n: number): Float64Array;
  * # Returns
  * Transformed data as a new `Float64Array`, or empty on invalid input
  */
-export function ifft_nd_wasm(data: Float64Array, grid_size: Uint32Array): Float64Array;
+export function ifft_nd_wasm(data: Float64Array | number[], grid_size: Uint32Array | number[]): Float64Array;
 
 /**
  * Computes the magnitude (length) of a vector
@@ -308,7 +308,7 @@ export function ifft_nd_wasm(data: Float64Array, grid_size: Uint32Array): Float6
  * # Returns
  * The magnitude of the vector
  */
-export function magnitude_wasm(v: Float64Array): number;
+export function magnitude_wasm(v: Float64Array | number[]): number;
 
 /**
  * Matrix exponential via Padé(13,13) with scaling-and-squaring.
@@ -323,7 +323,7 @@ export function magnitude_wasm(v: Float64Array): number;
  * # Returns
  * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
  */
-export function matrix_exponential_pade_wasm(a_re: Float64Array, a_im: Float64Array, n: number): Float64Array;
+export function matrix_exponential_pade_wasm(a_re: Float64Array | number[], a_im: Float64Array | number[], n: number): Float64Array;
 
 /**
  * Multiplies two square matrices: C = A × B
@@ -336,7 +336,7 @@ export function matrix_exponential_pade_wasm(a_re: Float64Array, a_im: Float64Ar
  * # Returns
  * Result matrix (n×n, row-major)
  */
-export function multiply_matrices_wasm(a: Float64Array, b: Float64Array, dimension: number): Float64Array;
+export function multiply_matrices_wasm(a: Float64Array | number[], b: Float64Array | number[], dimension: number): Float64Array;
 
 /**
  * Multiplies a matrix by a vector.
@@ -349,7 +349,7 @@ export function multiply_matrices_wasm(a: Float64Array, b: Float64Array, dimensi
  * # Returns
  * Result vector of length n
  */
-export function multiply_matrix_vector_wasm(matrix: Float64Array, vector: Float64Array, dimension: number): Float64Array;
+export function multiply_matrix_vector_wasm(matrix: Float64Array | number[], vector: Float64Array | number[], dimension: number): Float64Array;
 
 /**
  * Normalizes a vector to unit length
@@ -360,7 +360,7 @@ export function multiply_matrix_vector_wasm(matrix: Float64Array, vector: Float6
  * # Returns
  * Unit vector in the same direction
  */
-export function normalize_vector_wasm(v: Float64Array): Float64Array;
+export function normalize_vector_wasm(v: Float64Array | number[]): Float64Array;
 
 /**
  * Projects n-dimensional vertices to 3D positions using perspective projection.
@@ -373,7 +373,7 @@ export function normalize_vector_wasm(v: Float64Array): Float64Array;
  * # Returns
  * Flat array of 3D positions as Float32Array [x0, y0, z0, x1, y1, z1, ...]
  */
-export function project_vertices_wasm(flat_vertices: Float64Array, dimension: number, projection_distance: number): Float32Array;
+export function project_vertices_wasm(flat_vertices: Float64Array | number[], dimension: number, projection_distance: number): Float32Array;
 
 /**
  * Initializes the WASM module: installs the panic hook for readable error
@@ -391,7 +391,7 @@ export function start(): void;
  * # Returns
  * The difference vector
  */
-export function subtract_vectors_wasm(a: Float64Array, b: Float64Array): Float64Array;
+export function subtract_vectors_wasm(a: Float64Array | number[], b: Float64Array | number[]): Float64Array;
 
 /**
  * Von Neumann entropy from eigenvalues: S = -Σ λ_k ln(λ_k).
@@ -402,45 +402,47 @@ export function subtract_vectors_wasm(a: Float64Array, b: Float64Array): Float64
  * # Returns
  * Entropy value (natural log, nats), clamped to >= 0
  */
-export function von_neumann_entropy_wasm(eigenvalues: Float64Array): number;
+export function von_neumann_entropy_wasm(eigenvalues: Float64Array | number[]): number;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
-    readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-    readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly compute_full_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
-    readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
-    readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
-    readonly compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
-    readonly compute_partial_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => void;
-    readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
-    readonly compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
+    readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
+    readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+    readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly compute_full_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
+    readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number];
+    readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number];
+    readonly compute_level_spacing_wasm: (a: number, b: number) => [number, number];
+    readonly compute_partial_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number];
+    readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+    readonly compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number) => [number, number];
     readonly dirac_spinor_size_wasm: (a: number) => number;
     readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
-    readonly fft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
-    readonly fft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly generate_dirac_matrices_wasm: (a: number, b: number) => void;
-    readonly generate_disorder_noise_wasm: (a: number, b: number, c: number) => void;
-    readonly generate_disorder_potential_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly ifft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
-    readonly ifft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly fft_1d_wasm: (a: number, b: number, c: number) => [number, number];
+    readonly fft_nd_wasm: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly generate_dirac_matrices_wasm: (a: number) => [number, number];
+    readonly generate_disorder_noise_wasm: (a: number, b: number) => [number, number];
+    readonly generate_disorder_potential_wasm: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly ifft_1d_wasm: (a: number, b: number, c: number) => [number, number];
+    readonly ifft_nd_wasm: (a: number, b: number, c: number, d: number) => [number, number];
     readonly magnitude_wasm: (a: number, b: number) => number;
-    readonly matrix_exponential_pade_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly normalize_vector_wasm: (a: number, b: number, c: number) => void;
-    readonly project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly matrix_exponential_pade_wasm: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly normalize_vector_wasm: (a: number, b: number) => [number, number];
+    readonly project_vertices_wasm: (a: number, b: number, c: number, d: number) => [number, number];
     readonly start: () => void;
-    readonly subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly subtract_vectors_wasm: (a: number, b: number, c: number, d: number) => [number, number];
     readonly von_neumann_entropy_wasm: (a: number, b: number) => number;
-    readonly __wbindgen_export: (a: number, b: number) => number;
-    readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_export3: (a: number, b: number, c: number) => void;
-    readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+    readonly __wbindgen_malloc: (a: number, b: number) => number;
+    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __externref_table_alloc: () => number;
+    readonly __externref_drop_slice: (a: number, b: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

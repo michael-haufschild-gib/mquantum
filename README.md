@@ -25,7 +25,7 @@ If you are evaluating this for research use, read the validation-status doc firs
 
 - **Rendering**: Custom WebGPU renderer (raw `GPUDevice` / `GPUCommandEncoder`)
 - **Shaders**: WGSL (149 shader modules, composed via `assembleShaderBlocks()`)
-- **Frontend**: React 19 + TypeScript 5 + Vite 7
+- **Frontend**: React 19 + TypeScript 7 + Vite 8
 - **State**: Zustand 5
 - **Styling**: Tailwind CSS 4
 - **Math**: Rust/WASM for rotation and projection math
@@ -33,8 +33,8 @@ If you are evaluating this for research use, read the validation-status doc firs
 
 ## Prerequisites
 
-- Node.js 24+
-- pnpm 10+
+- Node.js 24.15+ (24.x) or 26+
+- pnpm 12+
 - A browser with WebGPU support (Chrome/Edge 113+, Firefox Nightly)
 - (Optional) Rust toolchain + wasm-pack for WASM builds
 

@@ -28,10 +28,10 @@ function mat(N: number, data: [number, number][]): ComplexMatrix {
 /**
  * Helper: check that two matrices are approximately equal.
  */
-function expectMatClose(A: ComplexMatrix, B: ComplexMatrix, N: number, tol = 1e-10) {
+function expectMatClose(A: ComplexMatrix, B: ComplexMatrix, N: number) {
   for (let i = 0; i < N * N; i++) {
-    expect(A.real[i]).toBeCloseTo(B.real[i]!, tol > 1e-6 ? 4 : 10)
-    expect(A.imag[i]).toBeCloseTo(B.imag[i]!, tol > 1e-6 ? 4 : 10)
+    expect(A.real[i]).toBeCloseTo(B.real[i]!, 10)
+    expect(A.imag[i]).toBeCloseTo(B.imag[i]!, 10)
   }
 }
 
@@ -42,6 +42,20 @@ describe('complex matrix contracts', () => {
 
     const Z = complexMatZero(0)
     expect(() => matrixExponentialPade(Z, 0)).toThrow(/dimension/)
+  })
+
+  it('supports shifted overlapping typed-array views', () => {
+    for (const operation of ['multiply', 'add', 'scale', 'copy'] as const) {
+      const storage = new Float64Array([1, 2, 3, 4, 0])
+      const input = { real: storage.subarray(0, 4), imag: new Float64Array([4, 3, 2, 1]) }
+      const out = { real: storage.subarray(1), imag: new Float64Array(4) }
+      if (operation === 'multiply') complexMatMul(input, complexMatIdentity(2), out, 2)
+      if (operation === 'add') complexMatAdd(input, complexMatZero(2), out, 2)
+      if (operation === 'scale') complexMatScale(input, 1, 0, out, 2)
+      if (operation === 'copy') complexMatCopy(input, out, 2)
+      expect(Array.from(out.real)).toEqual([1, 2, 3, 4])
+      expect(Array.from(out.imag)).toEqual([4, 3, 2, 1])
+    }
   })
 
   it('rejects buffers shorter than N*N', () => {
@@ -300,6 +314,12 @@ describe('complexMatNorm1', () => {
 })
 
 describe('matrixExponentialPade', () => {
+  it('preserves a tiny nilpotent shear', () => {
+    const shear = complexMatZero(2)
+    shear.real[1] = 1e-40
+    expect(matrixExponentialPade(shear, 2).real[1]! / 1e-40).toBeCloseTo(1, 14)
+  })
+
   it('exp(0) = I', () => {
     // Bug caught: zero-matrix special case returns wrong result.
     const N = 3
@@ -384,6 +404,20 @@ describe('matrixExponentialPade', () => {
 })
 
 describe('solveLinearSystem', () => {
+  it('solves well-conditioned complex systems at tiny and large scales', () => {
+    for (const scale of [1e-200, 1e200]) {
+      const Q = mat(1, [[scale, scale]])
+      const P = mat(1, [[-scale, scale]])
+      expectMatClose(solveLinearSystem(Q, P, 1), mat(1, [[0, 1]]), 1)
+    }
+  })
+
+  it('keeps a finite complex quotient when its unscaled numerator would overflow', () => {
+    const Q = mat(1, [[1, 1]])
+    const P = mat(1, [[Number.MAX_VALUE, Number.MAX_VALUE]])
+    expect(solveLinearSystem(Q, P, 1).real[0]).toBe(Number.MAX_VALUE)
+  })
+
   it('I * X = B yields X = B', () => {
     // Bug caught: solver returns wrong solution for trivial identity system.
     const N = 3

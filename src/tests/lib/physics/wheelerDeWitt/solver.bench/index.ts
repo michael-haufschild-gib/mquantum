@@ -16,7 +16,7 @@
  * @module tests/lib/physics/wheelerDeWitt/solver.bench
  */
 
-import { bench, describe } from 'vitest'
+import { describe } from 'vitest'
 
 import { DEFAULT_WHEELER_DEWITT_CONFIG as D } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
@@ -36,6 +36,7 @@ import {
   DEFAULT_STREAMLINE_INPUT,
   integrateWkbTrajectories,
 } from '@/lib/physics/wheelerDeWitt/wkbStreamlines'
+import { benchmark } from '@/tests/benchmark'
 
 /**
  * Store-default Wheeler–DeWitt input, derived from
@@ -59,7 +60,7 @@ const LOW_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 6
 const HIGH_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 192 }
 
 describe(`Wheeler–DeWitt solver — default grid (${DEFAULT_GRID_LABEL})`, () => {
-  bench(
+  benchmark(
     'Hartle–Hawking BC',
     () => {
       solveWheelerDeWitt({ ...DEFAULT_INPUT, boundaryCondition: 'noBoundary' })
@@ -67,7 +68,7 @@ describe(`Wheeler–DeWitt solver — default grid (${DEFAULT_GRID_LABEL})`, () 
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     'Vilenkin BC',
     () => {
       solveWheelerDeWitt({ ...DEFAULT_INPUT, boundaryCondition: 'tunneling' })
@@ -75,7 +76,7 @@ describe(`Wheeler–DeWitt solver — default grid (${DEFAULT_GRID_LABEL})`, () 
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     'DeWitt BC',
     () => {
       solveWheelerDeWitt({ ...DEFAULT_INPUT, boundaryCondition: 'deWitt' })
@@ -85,7 +86,7 @@ describe(`Wheeler–DeWitt solver — default grid (${DEFAULT_GRID_LABEL})`, () 
 })
 
 describe('Wheeler–DeWitt solver — grid-size scaling', () => {
-  bench(
+  benchmark(
     'Low grid (Na=64, Nphi=16)',
     () => {
       solveWheelerDeWitt(LOW_GRID_INPUT)
@@ -93,7 +94,7 @@ describe('Wheeler–DeWitt solver — grid-size scaling', () => {
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     `Default grid (${DEFAULT_GRID_LABEL})`,
     () => {
       solveWheelerDeWitt(DEFAULT_INPUT)
@@ -101,7 +102,7 @@ describe('Wheeler–DeWitt solver — grid-size scaling', () => {
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     `High grid (Na=192, Nphi=${D.gridNphi})`,
     () => {
       solveWheelerDeWitt(HIGH_GRID_INPUT)
@@ -113,7 +114,7 @@ describe('Wheeler–DeWitt solver — grid-size scaling', () => {
 describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
   const out = solveWheelerDeWitt(DEFAULT_INPUT)
 
-  bench(
+  benchmark(
     'WKB trajectory integration (default config)',
     () => {
       integrateWkbTrajectories(out, DEFAULT_STREAMLINE_INPUT)
@@ -123,7 +124,7 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
 
   const trajectories = integrateWkbTrajectories(out, DEFAULT_STREAMLINE_INPUT)
 
-  bench(
+  benchmark(
     'Static overlay splat (default config)',
     () => {
       buildStaticOverlay(trajectories, DEFAULT_STREAMLINE_INPUT.splatRadius, out.gridSize)
@@ -147,7 +148,7 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
   })
   rowDensity.set(baselineDensity)
 
-  bench(
+  benchmark(
     'Worldline pulse splat (default config)',
     () => {
       buildPulseOverlay(
@@ -174,7 +175,7 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
     pulseActiveIndices
   )
 
-  bench(
+  benchmark(
     'Worldline alpha animation tick (96^3 density texture)',
     () => {
       applyWdwPulseAlpha(
@@ -189,7 +190,7 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     'Worldline row-delta animation tick (96^3 density texture)',
     () => {
       applyWdwPulseAlphaRows(
@@ -205,7 +206,7 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
     { time: 500, warmupIterations: 3 }
   )
 
-  bench(
+  benchmark(
     'Operator residual check (full grid, band-filtered)',
     () => {
       wdwOperatorResidual(out, DEFAULT_INPUT)

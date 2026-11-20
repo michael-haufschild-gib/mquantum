@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client", "@webgpu/types"],
+    "paths": { "@/*": ["./src/*"] },
     "module": "ESNext",
     "skipLibCheck": true,
 

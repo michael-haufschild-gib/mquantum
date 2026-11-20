@@ -1,0 +1,18 @@
+allowBuilds:
+  esbuild: true
+  fsevents: true
+  sharp: true
+  ttf2woff2: true
+
+minimumReleaseAgeExclude:
+  - stylelint-config-standard@41.1.0
+  - stylelint@18.1.0
+
+# Madge uses the TypeScript 5 compiler API for dependency analysis.
+packageExtensions:
+  madge@8:
+    dependencies:
+      typescript: ^5.4.4
+
+overrides:
+  madge>typescript:peer: '-'

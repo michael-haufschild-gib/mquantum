@@ -12,12 +12,8 @@ import { WebGPUResourcePool } from '@/rendering/webgpu/core/WebGPUResourcePool'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 function descriptorDepthOrArrayLayers(size: GPUTextureDescriptor['size']): number {
-  if (typeof size === 'number') return 1
-  if (Array.isArray(size)) return size[2] ?? 1
-  if (Symbol.iterator in Object(size)) {
-    return [...(size as Iterable<number>)][2] ?? 1
-  }
-  return (size as { depthOrArrayLayers?: number }).depthOrArrayLayers ?? 1
+  if ('width' in size) return size.depthOrArrayLayers ?? 1
+  return Array.from(size)[2] ?? 1
 }
 
 describe('WebGPUResourcePool', () => {

@@ -68,7 +68,7 @@ export interface AdsDensityUpload {
  *
  * When the strategy holds a pooled bundle and hands it to the packer, a
  * slider-drag burst avoids ~6 MB/frame of typed-array GC churn (the density,
- * bulk, reField, boundary, horizonFlags buffers are all N³).
+ * bulk, reField and boundary buffers are all N³).
  */
 export interface AdsPackerScratch {
   /** Output texture bytes. Length = N³ × 4 (rgba16float). */
@@ -79,8 +79,6 @@ export interface AdsPackerScratch {
   reField: Float32Array
   /** Boundary-overlay shell amplitude. Bound-state path only. Length = N³. */
   boundary: Float32Array
-  /** 1 for voxels on the BTZ horizon shell, 0 otherwise. Length = N³. */
-  horizonFlags: Uint8Array
   /** Coarse HKLL real-part buffer. Length = max(C_s1, C_s2)³. */
   hkllRe: Float32Array
   /** Coarse HKLL imag-part buffer. Length = max(C_s1, C_s2)³. */
@@ -120,7 +118,6 @@ export function createAdsPackerScratch(gridSize: number = DENSITY_GRID_SIZE): Ad
     bulk: new Float32Array(total),
     reField: new Float32Array(total),
     boundary: new Float32Array(total),
-    horizonFlags: new Uint8Array(total),
     hkllRe: new Float32Array(coarseMax),
     hkllIm: new Float32Array(coarseMax),
   }
@@ -187,8 +184,7 @@ function isScratchCompatible(scratch: AdsPackerScratch, total: number): boolean 
     scratch.density.length >= total * 4 &&
     scratch.bulk.length >= total &&
     scratch.reField.length >= total &&
-    scratch.boundary.length >= total &&
-    scratch.horizonFlags.length >= total
+    scratch.boundary.length >= total
   )
 }
 
@@ -460,13 +456,9 @@ export function packBtzThermalDensityGrid(
   const { N, total } = resolveAdsDensityGridSize(targetGridSize)
   const useScratch = !!scratch && isScratchCompatible(scratch, total)
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
-  let bulk: Float32Array
-  if (useScratch) {
-    bulk = scratch!.bulk
-    bulk.fill(0)
-  } else {
-    bulk = new Float32Array(total)
-  }
+  const sliceSize = N * N
+  const bulk = useScratch ? scratch!.bulk.subarray(0, sliceSize) : new Float32Array(sliceSize)
+  if (useScratch) bulk.fill(0)
 
   const rplus = finiteAtLeast(ads.btzHorizonRadius, BTZ_DEFAULT_HORIZON_RADIUS, 1e-3)
   const L = 1
@@ -481,53 +473,43 @@ export function packBtzThermalDensityGrid(
   const uRange = 1 - outerHorizon
 
   let peakDensity = 0
-  let horizonFlags: Uint8Array
-  if (useScratch) {
-    horizonFlags = scratch!.horizonFlags
-    horizonFlags.fill(0)
-  } else {
-    horizonFlags = new Uint8Array(total)
-  }
+  // The BTZ field is cylindrical. Evaluate and pack one xy plane.
+  for (let y = 0; y < N; y++) {
+    const wy = ((y + 0.5) / N) * 2 - 1
+    for (let x = 0; x < N; x++) {
+      const wx = ((x + 0.5) / N) * 2 - 1
+      const pixelIdx = y * N + x
+      const rhoW = Math.sqrt(wx * wx + wy * wy)
+      // Clip rendering to the inscribed cylinder so the outer cube corners
+      // don't bleed "boundary" density onto the camera path at oblique
+      // angles. (wz is always inside the cube by construction.)
+      if (rhoW > 1) continue
 
-  for (let z = 0; z < N; z++) {
-    for (let y = 0; y < N; y++) {
-      const wy = ((y + 0.5) / N) * 2 - 1
-      for (let x = 0; x < N; x++) {
-        const wx = ((x + 0.5) / N) * 2 - 1
-        const pixelIdx = (z * N + y) * N + x
-        const rhoW = Math.sqrt(wx * wx + wy * wy)
-        // Clip rendering to the inscribed cylinder so the outer cube corners
-        // don't bleed "boundary" density onto the camera path at oblique
-        // angles. (wz is always inside the cube by construction.)
-        if (rhoW > 1) continue
+      if (rhoW < horizonWorld) continue
 
-        if (rhoW < horizonWorld) continue
+      if (rhoW <= outerHorizon) {
+        // Opaque horizon shell marker.
+        bulk[pixelIdx] = BTZ_HORIZON_MARKER_AMP
+        if (BTZ_HORIZON_MARKER_AMP > peakDensity) peakDensity = BTZ_HORIZON_MARKER_AMP
+        continue
+      }
 
-        if (rhoW <= outerHorizon) {
-          // Opaque horizon shell marker.
-          bulk[pixelIdx] = BTZ_HORIZON_MARKER_AMP
-          horizonFlags[pixelIdx] = 1
-          if (BTZ_HORIZON_MARKER_AMP > peakDensity) peakDensity = BTZ_HORIZON_MARKER_AMP
-          continue
-        }
+      // Map ρ_w → u = r_+/r ∈ [u_min, 1]
+      const uNorm = 1 - (rhoW - outerHorizon) / uRange
+      const uClamped = Math.max(uNorm, BTZ_U_MIN)
+      const r = rplus / uClamped
+      const phi = Math.atan2(wy, wx)
 
-        // Map ρ_w → u = r_+/r ∈ [u_min, 1]
-        const uNorm = 1 - (rhoW - outerHorizon) / uRange
-        const uClamped = Math.max(uNorm, BTZ_U_MIN)
-        const r = rplus / uClamped
-        const phi = Math.atan2(wy, wx)
-
-        const amp = btzThermalAmplitude(r, phi, rplus, L, omega, delta, mA, beta)
-        if (amp > 0) {
-          bulk[pixelIdx] = amp
-          if (amp > peakDensity) peakDensity = amp
-        }
+      const amp = btzThermalAmplitude(r, phi, rplus, L, omega, delta, mA, beta)
+      if (amp > 0) {
+        bulk[pixelIdx] = amp
+        if (amp > peakDensity) peakDensity = amp
       }
     }
   }
 
   const peakNorm = peakDensity > 0 ? 1 / peakDensity : 0
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < sliceSize; i++) {
     const amp = bulk[i]!
     if (amp === 0) {
       packRGBA16F(density, i, 0, Math.log(1e-10), 0, 0)
@@ -541,13 +523,17 @@ export function packBtzThermalDensityGrid(
     // Encode horizon marker into the phase channel so the color palette
     // paints horizon voxels with a distinct tone. Value chosen so the
     // cosine-palette lookup lands on a near-black phase colour.
-    const phase = horizonFlags[i] === 1 ? Math.PI : 0
+    const onHorizon = amp === BTZ_HORIZON_MARKER_AMP
+    const phase = onHorizon ? Math.PI : 0
     // Route horizon markers into the boundary-overlay channel so the
     // additive A blend in the raymarcher reinforces the shell at low
     // view angles where the shell voxels are thin.
-    const a = horizonFlags[i] === 1 ? 1 : 0
+    const a = onHorizon ? 1 : 0
     packRGBA16F(density, i, r, logRho, phase, a)
   }
+
+  const sliceChannels = sliceSize * 4
+  for (let z = 1; z < N; z++) density.copyWithin(z * sliceChannels, 0, sliceChannels)
 
   return {
     density,

@@ -130,13 +130,12 @@ export function computeCoordinateEntanglement(
   for (let i = 0; i < psiRe.length; i++) {
     norm2 += psiRe[i]! * psiRe[i]! + psiIm[i]! * psiIm[i]!
   }
-  // Guard against near-zero norm (numerical noise from GPU readback) —
-  // amplifying 1e-20 by invNorm ≈ 1e10 would produce nonsensical RDMs.
-  // A zero vector is not a quantum state; do not report it as S=0 separable physics.
-  if (!Number.isFinite(norm2) || norm2 <= 1e-12) {
+  // Entanglement depends on the normalized state, independent of its overall amplitude.
+  // A nonzero Float32 amplitude has a representable squared magnitude in Float64.
+  if (!Number.isFinite(norm2) || norm2 === 0) {
     return emptyCoordinateEntanglementResult(N, options)
   }
-  if (norm2 > 1e-12 && Math.abs(norm2 - 1) > 1e-6) {
+  if (Math.abs(norm2 - 1) > 1e-6) {
     const invNorm = 1 / Math.sqrt(norm2)
     const normRe = new Float32Array(psiRe.length)
     const normIm = new Float32Array(psiIm.length)
@@ -171,7 +170,8 @@ export function computeCoordinateEntanglement(
     const rdm = computeReducedDensityMatrix(psiRe, psiIm, gridSize, d)
     const eigenvalues = hermitianEigenvalues(rdm.re, rdm.im, rdm.M)
     const S = vonNeumannEntropy(eigenvalues)
-    const maxS = Math.log(rdm.M)
+    // The Schmidt rank cannot exceed the size of either side of the cut.
+    const maxS = Math.log(Math.min(M, psiRe.length / M))
     entropies[d] = S
     maxEntropies[d] = maxS
     computedSum += S
@@ -193,8 +193,24 @@ export function computeCoordinateEntanglement(
   }
 
   const averageEntropy = computedCount > 0 ? computedSum / computedCount : Number.NaN
-  const maxAvg = computedCount > 0 ? computedMaxSum / computedCount : 0
-  const normalizedEntropy = computedCount > 0 && maxAvg > 0 ? averageEntropy / maxAvg : Number.NaN
+  const normalizedEntropy =
+    computedMaxSum > 0 ? computedSum / computedMaxSum : computedCount ? 0 : NaN
+
+  function subsystemEntropy(axes: number[], limit: number): number | null {
+    // For a pure state either side of a cut has the same nonzero spectrum.
+    const size = axes.reduce((product, d) => product * gridSize[d]!, 1)
+    const otherSize = psiRe.length / size
+    if (Math.min(size, otherSize) === 1) return 0
+    if (Math.min(size, otherSize) > limit) return null
+    const kept =
+      size <= otherSize ? axes : gridSize.map((_, d) => d).filter((d) => !axes.includes(d))
+    if (kept.length === 1) {
+      const cached = entropies[kept[0]!]
+      if (cached != null) return cached
+    }
+    const rdm = computeJointReducedDensityMatrix(psiRe, psiIm, gridSize, kept)
+    return rdm ? vonNeumannEntropy(hermitianEigenvalues(rdm.re, rdm.im, rdm.M)) : null
+  }
 
   // ── Bipartition entropies S_{k|N-k} for k=1,...,⌊N/2⌋ ────────────────
   const bipartitionEntropies: (number | null)[] = []
@@ -203,19 +219,7 @@ export function computeCoordinateEntanglement(
     for (let k = 1; k <= halfN; k++) {
       // Use the first k dimensions as the kept subsystem
       const dims = Array.from({ length: k }, (_, i) => i)
-      let Mjoint = 1
-      for (const d of dims) Mjoint *= gridSize[d]!
-      if (Mjoint > MAX_BIPARTITION_RDM) {
-        bipartitionEntropies.push(null)
-        continue
-      }
-      const rdm = computeJointReducedDensityMatrix(psiRe, psiIm, gridSize, dims)
-      if (!rdm) {
-        bipartitionEntropies.push(null)
-        continue
-      }
-      const eigenvalues = hermitianEigenvalues(rdm.re, rdm.im, rdm.M)
-      bipartitionEntropies.push(vonNeumannEntropy(eigenvalues))
+      bipartitionEntropies.push(subsystemEntropy(dims, MAX_BIPARTITION_RDM))
     }
   }
 
@@ -231,14 +235,8 @@ export function computeCoordinateEntanglement(
       for (let d2 = d1 + 1; d2 < N; d2++) {
         const s2 = entropies[d2]
         if (s2 === null || s2 === undefined) continue
-        const jointSize = gridSize[d1]! * gridSize[d2]!
-        if (jointSize > MAX_PAIRWISE_RDM) continue
-
-        const jointRdm = computeJointReducedDensityMatrix(psiRe, psiIm, gridSize, [d1, d2])
-        if (!jointRdm) continue
-
-        const jointEigs = hermitianEigenvalues(jointRdm.re, jointRdm.im, jointRdm.M)
-        const jointEntropy = vonNeumannEntropy(jointEigs)
+        const jointEntropy = subsystemEntropy([d1, d2], MAX_PAIRWISE_RDM)
+        if (jointEntropy === null) continue
         // MI is non-negative by definition; clamp to 0 for float precision artifacts
         const mi = Math.max(s1 + s2 - jointEntropy, 0)
         mutualInfo[d1 * N + d2] = mi

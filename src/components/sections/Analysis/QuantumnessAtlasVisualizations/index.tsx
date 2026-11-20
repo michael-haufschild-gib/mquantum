@@ -14,6 +14,8 @@ import React from 'react'
 
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 
+import { DIAG_COLORS } from './colors'
+
 // ─── SVG constants ───────────────────────────────────────────────────────────
 
 const CHART_W = 260
@@ -21,13 +23,6 @@ const CHART_H = 100
 const PAD = { left: 32, right: 8, top: 8, bottom: 20 }
 const PW = CHART_W - PAD.left - PAD.right
 const PH = CHART_H - PAD.top - PAD.bottom
-
-/** Diagnostic line/dot colors, keyed to CSS chart variables. */
-export const DIAG_COLORS = {
-  entanglement: 'var(--chart-pass-2)', // blue
-  wigner: 'var(--chart-pass-3)', // orange
-  ipr: 'var(--chart-pass-1)', // green
-} as const
 
 const DIM_COLORS = [
   'var(--chart-pass-2)', // 3D - blue

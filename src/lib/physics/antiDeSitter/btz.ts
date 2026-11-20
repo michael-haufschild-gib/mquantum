@@ -20,29 +20,25 @@
  * We use Δ = Δ_+ = 1 + √(1 + m²L²) (stable branch; BF bound m²L² > −1).
  *
  * ## Hartle-Hawking thermal amplitude (rendering ansatz)
- * The full Hartle-Hawking two-point on BTZ is a sum over Z_N images of the
- * AdS₃ Euclidean correlator. For a renderable scalar envelope we use the
+ * The full Hartle-Hawking two-point on BTZ is a sum over angular images of the
+ * AdS₃ correlator. For a renderable scalar envelope we use the
  * local thermal amplitude
  *
- *   |ψ|²(r, φ) = n_β(ω_loc(r)) · |R_∞(r, φ)|²
+ *   |ψ|²(r, φ) = n(β_loc(r) ω) · |R_∞(r, φ)|²
  *
- * with the Tolman-redshifted local frequency
- *   ω_loc(r) = ω · √max(f(r), ε_f),
- * the bosonic occupation
- *   n_β(x) = 1 / (exp(β·x) − 1),
- * inverse temperature β = 1/T_H, and the asymptotic radial × angular
- * envelope
+ * for a probe at fixed proper frequency ω. The Tolman temperature is
+ * T_loc = T_H / √f, so β_loc = β √max(f(r), ε_f), with β = 1/T_H.
+ * The Bose occupation is n(x) = 1/(exp(x) − 1). The spatial envelope is
  *   |R_∞(r, φ)|² = (r_+/r)^{2Δ} · A_{m_A}(φ),
  * where A uses a signed cos/sin basis so ±m_A give distinguishable patterns
  *   A_{m_A}(φ) = cos²(m_A φ) if m_A ≥ 0,
  *              = sin²(|m_A|φ) if m_A < 0.
- * Both are positive-definite with 2|m_A| lobes on S¹; the sin branch is the
+ * Both are non-negative with 2|m_A| lobes on S¹; the sin branch is the
  * cos branch rotated by π/(2|m_A|), so sweeping m_A through zero smoothly
  * reorients the angular interference.
  *
- * Near the horizon f(r) → 0 drives ω_loc → 0 so n_β ~ T_H/ω_loc ~ 1/√f,
- * reproducing the expected Hartle-Hawking thermal divergence — clamped
- * here by `epsilonF` for renderability.
+ * Near the horizon the local temperature grows as 1/√f, increasing the
+ * occupation of this fixed-frequency probe. The renderer regulates f by ε_f.
  *
  * ## Units
  * We work in simulation units G_N = L = ℏ = 1 by default. The entropy and
@@ -164,8 +160,7 @@ export function btzScalarDelta(mL: number): number {
  * Hartle-Hawking thermal amplitude |ψ|²(r, φ) used by the BTZ density
  * packer. Returns 0 inside the horizon (r < r_+). Outside, combines:
  *
- *   - The local Bose-Einstein population n_β(ω_loc(r)) with Tolman-
- *     redshifted ω_loc = ω · √max(f(r), epsilonF).
+ *   - The Bose population at the Tolman local temperature and fixed proper frequency.
  *   - The normalisable radial-angular envelope (r_+/r)^{2Δ} · cos²(m_A φ).
  *   - A final clamp at `BTZ_AMPLITUDE_CEILING` to keep the value renderable.
  *
@@ -176,7 +171,7 @@ export function btzScalarDelta(mL: number): number {
  * @param phi - Azimuthal angle φ in radians.
  * @param rplus - Outer horizon radius r_+ (r_+ > 0).
  * @param L - AdS₃ length scale (L > 0).
- * @param omega - Mode angular frequency ω (in inverse L units).
+ * @param omega - Fixed proper angular frequency of the thermal probe (in inverse L units).
  * @param delta - Scalar asymptotic dimension Δ (see `btzScalarDelta`).
  * @param mAngular - Azimuthal quantum number m on the BTZ S¹ (integer).
  * @param beta - Inverse temperature β = 1 / T_H.
@@ -211,20 +206,8 @@ export function btzThermalAmplitude(
 
   const f = btzMetricF(r, rplus, L)
   const fSafe = Math.max(f, epsilonF)
-  const omegaLoc = omega * Math.sqrt(fSafe)
-
-  // Bose-Einstein population. Guard against β·ω_loc → 0 (infinite classical
-  // limit) — small-argument expansion n_β ≈ 1/(β·ω) − 1/2.
-  const x = beta * omegaLoc
-  let nBeta: number
-  if (x <= 1e-6) {
-    // Fallback to the classical Rayleigh-Jeans limit to avoid catastrophic
-    // cancellation in exp(x) − 1 at tiny x.
-    nBeta = 1 / Math.max(x, 1e-12)
-  } else {
-    const denom = Math.exp(x) - 1
-    nBeta = denom > 0 ? 1 / denom : 0
-  }
+  const betaLocal = beta * Math.sqrt(fSafe)
+  const nBeta = 1 / Math.expm1(Math.max(betaLocal * omega, 1e-12))
 
   // Asymptotic radial envelope (r_+/r)^{2Δ}. At r = r_+ gives 1; at r → ∞
   // decays to 0 like the CFT-expected r^{−2Δ} falloff.

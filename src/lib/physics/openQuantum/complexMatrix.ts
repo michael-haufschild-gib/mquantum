@@ -27,8 +27,6 @@ export interface ComplexMatrix {
   imag: Float64Array
 }
 
-const SINGULAR_PIVOT_TOL = 1e-30
-
 function matrixEntryCount(N: number, caller: string, allowZero = false): number {
   const min = allowZero ? 0 : 1
   if (!Number.isSafeInteger(N) || N < min) {
@@ -99,17 +97,26 @@ export function complexMatIdentity(N: number): ComplexMatrix {
 /** Minimum N for WASM complex matmul — below this, FFI overhead dominates. */
 const WASM_MATMUL_MIN_N = 64
 
-function outputAliasesInput(A: ComplexMatrix, B: ComplexMatrix, out: ComplexMatrix): boolean {
+function overlaps(a: Float64Array, b: Float64Array, size: number): boolean {
+  return a.buffer === b.buffer && Math.abs(a.byteOffset - b.byteOffset) < size * a.BYTES_PER_ELEMENT
+}
+
+function sharesEntries(a: ComplexMatrix, b: ComplexMatrix, size: number): boolean {
   return (
-    out.real === A.real ||
-    out.real === A.imag ||
-    out.real === B.real ||
-    out.real === B.imag ||
-    out.imag === A.real ||
-    out.imag === A.imag ||
-    out.imag === B.real ||
-    out.imag === B.imag
+    overlaps(a.real, b.real, size) ||
+    overlaps(a.imag, b.imag, size) ||
+    overlaps(a.real, b.imag, size) ||
+    overlaps(a.imag, b.real, size)
   )
+}
+
+function copyEntries(a: ComplexMatrix, size: number): ComplexMatrix {
+  return { real: a.real.slice(0, size), imag: a.imag.slice(0, size) }
+}
+
+function elementwiseInput(a: ComplexMatrix, out: ComplexMatrix, size: number): ComplexMatrix {
+  if (a.real === out.real && a.imag === out.imag) return a
+  return sharesEntries(a, out, size) ? copyEntries(a, size) : a
 }
 
 /**
@@ -138,7 +145,7 @@ export function complexMatMul(
   validateMatrixBuffer(B, size, 'B', 'complexMatMul')
   validateMatrixBuffer(out, size, 'out', 'complexMatMul')
 
-  if (outputAliasesInput(A, B, out)) {
+  if (sharesEntries(A, out, size) || sharesEntries(B, out, size)) {
     const temp = complexMatZero(N)
     complexMatMul(A, B, temp, N)
     complexMatCopy(temp, out, N)
@@ -202,6 +209,8 @@ export function complexMatAdd(
   validateMatrixBuffer(B, size, 'B', 'complexMatAdd')
   validateMatrixBuffer(out, size, 'out', 'complexMatAdd')
 
+  A = elementwiseInput(A, out, size)
+  B = elementwiseInput(B, out, size)
   for (let i = 0; i < size; i++) {
     out.real[i] = A.real[i]! + B.real[i]!
     out.imag[i] = A.imag[i]! + B.imag[i]!
@@ -231,6 +240,7 @@ export function complexMatScale(
     throw new RangeError('complexMatScale: scalar must be finite')
   }
 
+  A = elementwiseInput(A, out, size)
   for (let i = 0; i < size; i++) {
     const re = A.real[i]!
     const im = A.imag[i]!
@@ -251,6 +261,7 @@ export function complexMatCopy(src: ComplexMatrix, dst: ComplexMatrix, N: number
   validateMatrixBuffer(src, size, 'src', 'complexMatCopy')
   validateMatrixBuffer(dst, size, 'dst', 'complexMatCopy')
 
+  src = elementwiseInput(src, dst, size)
   dst.real.set(src.real.subarray(0, size))
   dst.imag.set(src.imag.subarray(0, size))
 }
@@ -273,7 +284,7 @@ export function complexMatNorm1(A: ComplexMatrix, N: number): number {
       const idx = i * N + j
       colSum += Math.hypot(A.real[idx]!, A.imag[idx]!)
     }
-    if (colSum > maxCol) maxCol = colSum
+    maxCol = Math.max(maxCol, colSum)
   }
   return maxCol
 }
@@ -285,14 +296,6 @@ export function complexMatNorm1(A: ComplexMatrix, N: number): number {
 /** Maximum N for pre-allocated scratch pools. Covers K=14 → N=196. */
 const MAX_PADE_N = 196
 
-// Pre-allocated scratch buffers for solveLinearSystem (N ≤ MAX_PADE_N)
-const solveScratch = {
-  Ar: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  Ai: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  Br: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  Bi: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-}
-
 /**
  * Solve Q · X = P via Gaussian elimination with partial pivoting.
  * Solves for the full N×N right-hand side simultaneously.
@@ -303,33 +306,18 @@ const solveScratch = {
  * @returns Solution matrix X
  */
 export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number): ComplexMatrix {
-  // Augmented matrix: [A | B] where A = Q, B = P
-  // Work on copies (use pre-allocated buffers for N ≤ MAX_PADE_N)
   const size = matrixEntryCount(N, 'solveLinearSystem')
   validateMatrixBuffer(Q, size, 'Q', 'solveLinearSystem')
   validateMatrixBuffer(P, size, 'P', 'solveLinearSystem')
   assertFiniteMatrix(Q, size, 'Q', 'solveLinearSystem')
   assertFiniteMatrix(P, size, 'P', 'solveLinearSystem')
 
-  let Ar: Float64Array
-  let Ai: Float64Array
-  let Br: Float64Array
-  let Bi: Float64Array
-  if (N <= MAX_PADE_N) {
-    Ar = solveScratch.Ar
-    Ai = solveScratch.Ai
-    Br = solveScratch.Br
-    Bi = solveScratch.Bi
-    Ar.set(Q.real.subarray(0, size))
-    Ai.set(Q.imag.subarray(0, size))
-    Br.set(P.real.subarray(0, size))
-    Bi.set(P.imag.subarray(0, size))
-  } else {
-    Ar = new Float64Array(Q.real)
-    Ai = new Float64Array(Q.imag)
-    Br = new Float64Array(P.real)
-    Bi = new Float64Array(P.imag)
-  }
+  return solveInPlace(copyEntries(Q, size), copyEntries(P, size), N)
+}
+
+function solveInPlace(Q: ComplexMatrix, P: ComplexMatrix, N: number): ComplexMatrix {
+  const { real: Ar, imag: Ai } = Q
+  const { real: Br, imag: Bi } = P
 
   // Row permutation (physical row swaps instead of virtual pivoting)
   for (let col = 0; col < N; col++) {
@@ -338,7 +326,7 @@ export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number)
     let maxRow = col
     for (let row = col; row < N; row++) {
       const idx = row * N + col
-      const mag = Ar[idx]! * Ar[idx]! + Ai[idx]! * Ai[idx]!
+      const mag = Math.max(Math.abs(Ar[idx]!), Math.abs(Ai[idx]!))
       if (mag > maxMag) {
         maxMag = mag
         maxRow = row
@@ -367,24 +355,35 @@ export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number)
       }
     }
 
-    const pivRe = Ar[col * N + col]!
-    const pivIm = Ai[col * N + col]!
-    const pivMag2 = pivRe * pivRe + pivIm * pivIm
-    if (pivMag2 < SINGULAR_PIVOT_TOL) {
-      throw new Error(`solveLinearSystem: singular matrix at pivot ${col}`)
+    if (maxMag === 0) throw new Error(`solveLinearSystem: singular matrix at pivot ${col}`)
+    const pivot = col * N + col
+    const pr = Ar[pivot]! / maxMag
+    const pi = Ai[pivot]! / maxMag
+    const denom = pr * pr + pi * pi
+    const wr = pr / denom
+    const wi = pi / denom
+
+    // Normalize the pivot row. Scaling first avoids squaring a tiny or large pivot.
+    for (let j = 0; j < N; j++) {
+      const idx = col * N + j
+      if (j > col) {
+        const re = Ar[idx]! / maxMag
+        const im = Ai[idx]! / maxMag
+        Ar[idx] = re * wr + im * wi
+        Ai[idx] = im * wr - re * wi
+      }
+      const re = Br[idx]! / maxMag
+      const im = Bi[idx]! / maxMag
+      Br[idx] = re * wr + im * wi
+      Bi[idx] = im * wr - re * wi
     }
 
-    // Eliminate rows below
     for (let row = col + 1; row < N; row++) {
       const idx = row * N + col
-      const aRe = Ar[idx]!
-      const aIm = Ai[idx]!
+      const fRe = Ar[idx]!
+      const fIm = Ai[idx]!
 
-      // factor = A[row][col] / A[col][col]
-      const fRe = (aRe * pivRe + aIm * pivIm) / pivMag2
-      const fIm = (aIm * pivRe - aRe * pivIm) / pivMag2
-
-      for (let j = col; j < N; j++) {
+      for (let j = col + 1; j < N; j++) {
         const pj = col * N + j
         const rj = row * N + j
         Ar[rj] = Ar[rj]! - (fRe * Ar[pj]! - fIm * Ai[pj]!)
@@ -416,15 +415,8 @@ export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number)
         sumIm -= aRe * xIm + aIm * xRe
       }
 
-      const pivRe = Ar[row * N + row]!
-      const pivIm = Ai[row * N + row]!
-      const pivMag2 = pivRe * pivRe + pivIm * pivIm
-      if (pivMag2 < SINGULAR_PIVOT_TOL) {
-        throw new Error(`solveLinearSystem: singular matrix at pivot ${row}`)
-      }
-
-      result.real[row * N + j] = (sumRe * pivRe + sumIm * pivIm) / pivMag2
-      result.imag[row * N + j] = (sumIm * pivRe - sumRe * pivIm) / pivMag2
+      result.real[row * N + j] = sumRe
+      result.imag[row * N + j] = sumIm
     }
   }
 
@@ -442,55 +434,30 @@ const PADE_COEFFS_13 = [
 ]
 
 // ---------------------------------------------------------------------------
-// Padé scratch pool — reusable buffers sized for MAX_PADE_N
+// Padé workspace
 // ---------------------------------------------------------------------------
 
-/** Scratch matrices for matrixExponentialPade (avoids 12+ allocations per call) */
-const padeScratch = {
-  As: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  A2: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  A4: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  A6: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  // temp1/temp2 are reused across multiple intermediate steps
-  temp1: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  temp2: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  U: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  V: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
-  sq: {
-    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
-  } as ComplexMatrix,
+type PadeScratch = Record<'As' | 'A2' | 'A4' | 'A6' | 'temp1' | 'temp2' | 'U' | 'V', ComplexMatrix>
+
+function createPadeScratch(N: number): PadeScratch {
+  return {
+    As: complexMatZero(N),
+    A2: complexMatZero(N),
+    A4: complexMatZero(N),
+    A6: complexMatZero(N),
+    temp1: complexMatZero(N),
+    temp2: complexMatZero(N),
+    U: complexMatZero(N),
+    V: complexMatZero(N),
+  }
 }
 
-/** Zero the first N*N elements of a scratch matrix. */
-function zeroScratch(m: ComplexMatrix, N: number): void {
-  const size = N * N
-  m.real.fill(0, 0, size)
-  m.imag.fill(0, 0, size)
+let padeScratch: PadeScratch | undefined
+
+function getPadeScratch(N: number): PadeScratch {
+  if (N > MAX_PADE_N) return createPadeScratch(N)
+  if (!padeScratch || padeScratch.As.real.length < N * N) padeScratch = createPadeScratch(N)
+  return padeScratch
 }
 
 /**
@@ -499,7 +466,7 @@ function zeroScratch(m: ComplexMatrix, N: number): void {
  * Computes exp(A) for an N×N complex matrix. Standard algorithm from
  * Al-Mohy & Higham (2009), same as MATLAB's expm / scipy's expm.
  *
- * Uses pre-allocated scratch pool for N ≤ 196 to eliminate GC pressure.
+ * Reuses a lazily allocated workspace for N ≤ 196 to eliminate GC pressure.
  * Delegates to WASM when available for ~2-3x speedup on large matrices.
  *
  * @param A - Input matrix (not modified)
@@ -516,8 +483,8 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
     const packed = matrixExponentialPadeWasm(A.real, A.imag, N)
     if (packed && packed.length === 2 * size) {
       return {
-        real: packed.slice(0, size),
-        imag: packed.slice(size),
+        real: packed.subarray(0, size),
+        imag: packed.subarray(size),
       }
     }
   }
@@ -529,27 +496,13 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   }
 
   // Handle zero matrix
-  if (norm < 1e-30) return complexMatIdentity(N)
+  if (norm === 0) return complexMatIdentity(N)
 
   // Scaling: s = max(0, ceil(log2(||A||_1 / θ_13)))
   const theta13 = 5.371920351148152
   const s = Math.max(0, Math.ceil(Math.log2(norm / theta13)))
 
-  const useScratch = N <= MAX_PADE_N
-
-  // Allocate or reuse scratch matrices
-  const As = useScratch ? (zeroScratch(padeScratch.As, N), padeScratch.As) : complexMatZero(N)
-  const A2 = useScratch ? (zeroScratch(padeScratch.A2, N), padeScratch.A2) : complexMatZero(N)
-  const A4 = useScratch ? (zeroScratch(padeScratch.A4, N), padeScratch.A4) : complexMatZero(N)
-  const A6 = useScratch ? (zeroScratch(padeScratch.A6, N), padeScratch.A6) : complexMatZero(N)
-  const temp1 = useScratch
-    ? (zeroScratch(padeScratch.temp1, N), padeScratch.temp1)
-    : complexMatZero(N)
-  const temp2 = useScratch
-    ? (zeroScratch(padeScratch.temp2, N), padeScratch.temp2)
-    : complexMatZero(N)
-  const U = useScratch ? (zeroScratch(padeScratch.U, N), padeScratch.U) : complexMatZero(N)
-  const V = useScratch ? (zeroScratch(padeScratch.V, N), padeScratch.V) : complexMatZero(N)
+  const { As, A2, A4, A6, temp1, temp2, U, V } = getPadeScratch(N)
 
   // Scale: A_s = A / 2^s
   const scaleFactor = Math.pow(2, -s)
@@ -612,28 +565,11 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
     temp2.imag[i] = V.imag[i]! - U.imag[i]!
   }
 
-  let X = solveLinearSystem(temp2, temp1, N)
-
-  // Squaring phase: exp(A) = X^{2^s}
-  // Alternate between X and a scratch buffer to avoid allocation per squaring step
-  if (s > 0) {
-    const sq = useScratch ? (zeroScratch(padeScratch.sq, N), padeScratch.sq) : complexMatZero(N)
-    for (let i = 0; i < s; i++) {
-      if (i % 2 === 0) {
-        complexMatMul(X, X, sq, N)
-      } else {
-        complexMatMul(sq, sq, X, N)
-      }
-    }
-    // Ensure the result is in the correct buffer
-    if (s % 2 === 1) {
-      // Result is in sq — copy to a new matrix (can't return scratch)
-      const result = complexMatZero(N)
-      result.real.set(sq.real.subarray(0, size))
-      result.imag.set(sq.imag.subarray(0, size))
-      return result
-    }
+  const X = solveInPlace(temp2, temp1, N)
+  for (let i = 0; i < s; i++) {
+    if (i % 2 === 0) complexMatMul(X, X, temp1, N)
+    else complexMatMul(temp1, temp1, X, N)
   }
-
+  if (s % 2 === 1) complexMatCopy(temp1, X, N)
   return X
 }

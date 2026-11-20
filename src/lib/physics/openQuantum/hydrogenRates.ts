@@ -82,8 +82,7 @@ export function thermalOccupation(omega: number, temperature: number): number {
     return 0
   }
   const x = omega / (KB_ATOMIC * temperature)
-  if (x > 500) return 0 // negligible thermal population
-  return 1 / (Math.exp(x) - 1)
+  return Math.exp(-x) / -Math.expm1(-x)
 }
 
 /**

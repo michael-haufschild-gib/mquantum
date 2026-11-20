@@ -11,8 +11,7 @@ import type { HydrogenBasisState } from './hydrogenBasis'
 import { KB_ATOMIC, type TransitionRate } from './hydrogenRates'
 import { hermitianEigendecompose, MAX_K } from './integrator'
 import { isAllowedE1 } from './selectionRules'
-import type { LindbladChannel } from './types'
-import type { DensityMatrix } from './types'
+import type { DensityMatrix, LindbladChannel } from './types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,7 +21,7 @@ import type { DensityMatrix } from './types'
 export interface ValidationResult {
   /** Whether all checks passed */
   valid: boolean
-  /** Maximum |ρ_{kl} - ρ_{lk}*| across all off-diagonal elements */
+  /** Maximum |ρ_{kl} - ρ_{lk}*| across all elements */
   hermitianResidual: number
   /** |Tr(ρ) - 1| */
   traceDrift: number
@@ -41,7 +40,6 @@ const validationHermitianProjection: DensityMatrix = {
 
 function minHermitianEigenvalue(rho: DensityMatrix): number {
   const K = rho.K
-  if (!Number.isInteger(K) || K < 1 || K > MAX_K) return Number.NEGATIVE_INFINITY
 
   const source = rho.elements
   const mutableProjection = validationHermitianProjection as { K: number; elements: Float64Array }
@@ -99,11 +97,21 @@ export function validateDensityMatrix(
   const el = rho.elements
   const violations: string[] = []
 
+  if (!Number.isInteger(K) || K < 1 || K > MAX_K || el.length < 2 * K * K) {
+    violations.push('Invalid density matrix dimensions')
+  } else if (!el.subarray(0, 2 * K * K).every(Number.isFinite)) {
+    violations.push('Non-finite density matrix element')
+  }
+  if (!Number.isFinite(tolerance) || tolerance < 0) violations.push('Invalid tolerance')
+  if (violations.length) {
+    return { valid: false, hermitianResidual: NaN, traceDrift: NaN, minEigenvalue: NaN, violations }
+  }
+
   // Check Hermiticity: ρ_{kl} = ρ_{lk}*
   let maxHermResidual = 0
   for (let k = 0; k < K; k++) {
     // Diagonal imaginary should be 0
-    const diagIm = Math.abs(el[2 * (k * K + k) + 1]!)
+    const diagIm = 2 * Math.abs(el[2 * (k * K + k) + 1]!)
     if (diagIm > maxHermResidual) maxHermResidual = diagIm
 
     for (let l = k + 1; l < K; l++) {
@@ -111,7 +119,7 @@ export function validateDensityMatrix(
       const idxLK = 2 * (l * K + k)
       const diffRe = Math.abs(el[idxKL]! - el[idxLK]!)
       const diffIm = Math.abs(el[idxKL + 1]! + el[idxLK + 1]!)
-      const residual = Math.max(diffRe, diffIm)
+      const residual = Math.hypot(diffRe, diffIm)
       if (residual > maxHermResidual) maxHermResidual = residual
     }
   }
@@ -121,10 +129,12 @@ export function validateDensityMatrix(
 
   // Check trace
   let trace = 0
+  let traceIm = 0
   for (let k = 0; k < K; k++) {
     trace += el[2 * (k * K + k)]!
+    traceIm += el[2 * (k * K + k) + 1]!
   }
-  const traceDrift = Math.abs(trace - 1)
+  const traceDrift = Math.hypot(trace - 1, traceIm)
   if (traceDrift > tolerance) {
     violations.push(`Trace drift: ${traceDrift.toExponential(2)}`)
   }
@@ -134,7 +144,9 @@ export function validateDensityMatrix(
   // rank-1 pure state over K>=3 has diag=1/K and off-diagonal row sum
   // (K-1)/K, so a bound-only check falsely reports a negative eigenvalue.
   const minEigenvalue = minHermitianEigenvalue(rho)
-  if (minEigenvalue < -tolerance) {
+  if (!Number.isFinite(minEigenvalue)) {
+    violations.push('Non-finite eigenvalue')
+  } else if (minEigenvalue < -tolerance) {
     violations.push(`Negative eigenvalue: ${minEigenvalue.toExponential(2)}`)
   }
 
@@ -165,18 +177,36 @@ export function validateDetailedBalance(
   temperature: number,
   tolerance: number = 1e-4
 ): boolean {
+  if (
+    !Number.isFinite(temperature) ||
+    temperature < 0 ||
+    !Number.isFinite(tolerance) ||
+    tolerance < 0
+  )
+    return false
   for (const rate of rates) {
-    if (rate.gammaDown <= 0) continue
+    if (
+      !Number.isFinite(rate.gammaDown) ||
+      rate.gammaDown < 0 ||
+      !Number.isFinite(rate.gammaUp) ||
+      rate.gammaUp < 0 ||
+      !Number.isFinite(rate.omega) ||
+      rate.omega <= 0
+    )
+      return false
+    if (rate.gammaDown === 0) {
+      if (rate.gammaUp !== 0) return false
+      continue
+    }
     if (temperature <= 0) {
       // At T=0, γ_up should be 0
-      if (rate.gammaUp > tolerance) return false
+      if (rate.gammaUp !== 0) return false
       continue
     }
 
     const expectedRatio = Math.exp(-rate.omega / (KB_ATOMIC * temperature))
-    const actualRatio = rate.gammaUp / rate.gammaDown
-    const relError = Math.abs(actualRatio - expectedRatio) / Math.max(expectedRatio, 1e-30)
-    if (relError > tolerance) return false
+    const expectedUp = rate.gammaDown * expectedRatio
+    if (Math.abs(rate.gammaUp - expectedUp) > tolerance * expectedUp) return false
   }
 
   return true
@@ -198,12 +228,10 @@ export function validateSelectionRules(
   basis: readonly HydrogenBasisState[]
 ): boolean {
   for (const ch of channels) {
-    // Skip dephasing channels (row === col)
-    if (ch.row === ch.col) continue
-
     const stateRow = basis[ch.row]
     const stateCol = basis[ch.col]
     if (!stateRow || !stateCol) return false
+    if (ch.row === ch.col) continue
 
     if (!isAllowedE1(stateRow, stateCol)) return false
   }

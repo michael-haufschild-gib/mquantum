@@ -53,25 +53,15 @@ function resolveJacobiMaxSweeps(caller: string, maxSweeps: number): number {
   return maxSweeps
 }
 
-/**
- * Compute the Frobenius norm of the off-diagonal part of a symmetric
- * matrix `M` plus the norm of its diagonal.
- *
- * @param M - Row-major symmetric matrix.
- * @param n - Matrix order.
- * @returns `{ offDiagNorm, diagNorm }`.
- */
-function frobeniusSplit(M: Float64Array, n: number): { offDiagNorm: number; diagNorm: number } {
-  let offDiagNorm = 0
-  let diagNorm = 1
+/** Ratio of off-diagonal to diagonal Frobenius norms, scaled before squaring. */
+function relativeOffDiagonalNorm(M: Float64Array, n: number, scale: number): number {
+  let off = 0
+  let diag = 0
   for (let i = 0; i < n; i++) {
-    diagNorm = Math.hypot(diagNorm, M[i * n + i]!)
-    for (let j = i + 1; j < n; j++) {
-      const v = M[i * n + j]!
-      offDiagNorm = Math.hypot(offDiagNorm, Math.SQRT2 * v)
-    }
+    diag += (M[i * n + i]! / scale) ** 2
+    for (let j = i + 1; j < n; j++) off += (M[i * n + j]! / scale) ** 2
   }
-  return { offDiagNorm, diagNorm }
+  return off === 0 ? 0 : Math.sqrt((2 * off) / diag)
 }
 
 /**
@@ -93,13 +83,14 @@ function applyJacobiRotation(
   q: number
 ): void {
   const apq = M[p * n + q]!
-  if (Math.abs(apq) < 1e-300) return
+  if (apq === 0) return
 
   const app = M[p * n + p]!
   const aqq = M[q * n + q]!
 
   // Rutishauser form: compute t = tan(θ) of the rotation that zeros (p, q).
-  const tau = (aqq - app) / (2 * apq)
+  const scale = Math.max(Math.abs(app), Math.abs(aqq), Math.abs(apq))
+  const tau = app === aqq ? 0 : (aqq / scale - app / scale) / (2 * (apq / scale))
   const tauRoot = Math.hypot(1, tau)
   const t = tau >= 0 ? 1 / (tau + tauRoot) : -1 / (-tau + tauRoot)
   const c = 1 / Math.hypot(1, t)
@@ -182,19 +173,15 @@ function jacobiDiagonalizeInPlace(
   }
   if (n <= 1) return
 
-  for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    const { offDiagNorm, diagNorm } = frobeniusSplit(M, n)
-    if (offDiagNorm < JACOBI_TOL * diagNorm) return
+  let scale = 0
+  for (const entry of M) scale = Math.max(scale, Math.abs(entry))
+  if (scale === 0) return
+  let residual = relativeOffDiagonalNorm(M, n, scale)
+  for (let sweep = 0; sweep < maxSweeps && residual > JACOBI_TOL; sweep++) {
     jacobiSweep(M, V, n)
+    residual = relativeOffDiagonalNorm(M, n, scale)
   }
-
-  // Post-loop residual check. `frobeniusSplit` reports the off-diagonal
-  // Frobenius norm relative to `max(diagNorm, 1)` — the same yardstick the
-  // convergence test uses above — so the final `offDiagNorm / diagNorm`
-  // ratio is directly comparable to `JACOBI_TOL` and quantifies how far
-  // from diagonal the matrix still is.
-  const { offDiagNorm, diagNorm } = frobeniusSplit(M, n)
-  const residual = offDiagNorm / diagNorm
+  if (residual <= JACOBI_TOL) return
   throw new Error(
     `jacobiEigenvalues: failed to converge within ${maxSweeps} sweeps ` +
       `(n=${n}, residual=${residual.toExponential(3)}, tolerance=${JACOBI_TOL.toExponential(3)})`
@@ -219,15 +206,17 @@ function assertFiniteMatrix(A: Float64Array, size: number): void {
 /**
  * Copy an input matrix into a fresh symmetric scratch buffer.
  *
- * Averaging as `a / 2 + b / 2` avoids overflowing when two large finite
- * asymmetric entries have a finite mathematical mean.
+ * Halve separately only if the sum would overflow.
  */
 function copySymmetrizedMatrix(A: Float64Array, n: number, matrixSize: number): Float64Array {
   const M = new Float64Array(matrixSize)
   for (let i = 0; i < n; i++) {
     M[i * n + i] = A[i * n + i]!
     for (let j = i + 1; j < n; j++) {
-      const avg = 0.5 * A[i * n + j]! + 0.5 * A[j * n + i]!
+      const a = A[i * n + j]!
+      const b = A[j * n + i]!
+      const sum = a + b
+      const avg = Number.isFinite(sum) ? sum * 0.5 : a * 0.5 + b * 0.5
       M[i * n + j] = avg
       M[j * n + i] = avg
     }

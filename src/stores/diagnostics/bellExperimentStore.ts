@@ -3,7 +3,7 @@
  *
  * Holds the running statistical state of the Bell / CHSH experiment:
  * per-bin trial counts and sums, derived correlations E_ij and S with
- * 95 % Wald CI, ring buffers for the S(N) sparkline, side-by-side LHV
+ * 95 % score interval, ring buffers for the S(N) sparkline, side-by-side LHV
  * tracking, non-detection bookkeeping, and the M6 (η, v) atlas-sweep
  * placeholders.
  *
@@ -25,7 +25,7 @@ import { create } from 'zustand'
 import { type BellPairConfig, sanitizeBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { CANONICAL_CHSH_PHI } from '@/lib/physics/bell/analytic'
 import { sampleJointOutcome } from '@/lib/physics/bell/bornSample'
-import { Z_95 } from '@/lib/physics/bell/chsh'
+import { estimateChsh } from '@/lib/physics/bell/chsh'
 import { LHV_STRATEGIES, lhvDeterministicBell } from '@/lib/physics/bell/lhv'
 import { applyDetectionEfficiency, postSelectOutcome } from '@/lib/physics/bell/loopholes'
 import { PCG32 } from '@/lib/physics/bell/pcg32'
@@ -247,31 +247,6 @@ function emptySampler(): SamplerSnapshot {
   }
 }
 
-/** Compute S and its 95 % Wald CI from four bin snapshots. */
-function deriveS(bins: readonly BinSnapshot[]): {
-  S: number
-  sCI: { lo: number; hi: number; halfWidth: number }
-} {
-  if (bins.some((b) => b.count === 0)) {
-    return {
-      S: Number.NaN,
-      sCI: { lo: Number.NaN, hi: Number.NaN, halfWidth: Number.NaN },
-    }
-  }
-  const m0 = bins[0]!.mean
-  const m1 = bins[1]!.mean
-  const m2 = bins[2]!.mean
-  const m3 = bins[3]!.mean
-  const S = m0 - m1 + m2 + m3
-  const varSum =
-    (1 - m0 ** 2) / bins[0]!.count +
-    (1 - m1 ** 2) / bins[1]!.count +
-    (1 - m2 ** 2) / bins[2]!.count +
-    (1 - m3 ** 2) / bins[3]!.count
-  const halfWidth = Z_95 * Math.sqrt(Math.max(varSum, 0))
-  return { S, sCI: { lo: S - halfWidth, hi: S + halfWidth, halfWidth } }
-}
-
 /** Convert a config-side axis (θ, φ) to a Bloch unit vector. */
 function axisVec(axis: readonly [number, number]): Vec3 {
   return blochAngleToVec3(axis as readonly [number, number])
@@ -358,7 +333,7 @@ function snapshotAccumulator(acc: RunningAccumulator): SamplerSnapshot {
       mean: c > 0 ? (acc.sums[b] ?? 0) / c : Number.NaN,
     }
   }
-  const { S, sCI } = deriveS(bins)
+  const { S, sCI } = estimateChsh(bins)
   return { bins, S, sCI, nonDetections: acc.nonDetections }
 }
 

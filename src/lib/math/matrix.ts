@@ -23,7 +23,6 @@ const scratchMatrixB = new Map<number, Float64Array>()
 const scratchVector = new Map<number, Float64Array>()
 
 const MAX_MATRIX_ELEMENTS = 1_048_576
-const MAX_DETERMINANT_DIMENSION = 8
 
 function assertPositiveInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -102,6 +101,14 @@ export function createZeroMatrix(rows: number, cols: number): MatrixND {
   return new Float32Array(rows * cols)
 }
 
+function viewsOverlap(a: MatrixND, b: MatrixND): boolean {
+  return (
+    a.buffer === b.buffer &&
+    a.byteOffset < b.byteOffset + b.byteLength &&
+    b.byteOffset < a.byteOffset + a.byteLength
+  )
+}
+
 /**
  * Multiplies two square matrices
  * Formula: C[i][j] = Σ(A[i][k] * B[k][j])
@@ -133,7 +140,7 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
       `Output matrix dimensions incompatible: expected length ${len}, received ${out.length}`
     )
   }
-  if (out && (out === a || out === b)) {
+  if (out && (viewsOverlap(out, a) || viewsOverlap(out, b))) {
     throw new Error('Output matrix cannot alias input matrices; use multiplyMatricesInto instead')
   }
 
@@ -154,17 +161,7 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
     // WASM failed, fall through to JS implementation
   }
 
-  // JS fallback
-  for (let i = 0; i < dim; i++) {
-    const rowOffset = i * dim
-    for (let j = 0; j < dim; j++) {
-      let sum = 0
-      for (let k = 0; k < dim; k++) {
-        sum += a[rowOffset + k]! * b[k * dim + j]!
-      }
-      result[rowOffset + j] = sum
-    }
-  }
+  multiplyMatricesInto(result, a, b)
 
   return result
 }
@@ -189,24 +186,6 @@ function getAliasScratch(dim: number): MatrixND {
   return scratch
 }
 
-/**
- * Multiplies two matrices and writes the result directly into an output buffer.
- * This is the allocation-free variant for hot paths (animation loops).
- * Assumes square matrices of same dimension.
- *
- * Formula: out[i][j] = Σ(A[i][k] * B[k][j])
- *
- * IMPORTANT: Handles aliasing safely - if out === a or out === b, uses internal
- * scratch buffer to compute result before copying to out.
- *
- * OPT-MAT-1: Specialized unrolled path for 4×4 matrices (most common case)
- *
- * @param out - Pre-allocated output matrix. Modified in place.
- * @param a - First matrix
- * @param b - Second matrix
- * @throws {Error} If matrix dimensions are incompatible (DEV only)
- * @note Validation is DEV-only for performance in production hot paths
- */
 /**
  * OPT-MAT-1: Unrolled 4x4 matrix multiply into target buffer.
  * Benchmarked at 2.5x faster than generic loop for dim=4.
@@ -268,28 +247,22 @@ function multiplyMatricesGenericInto(
  *
  * Formula: out[i][j] = Sigma(A[i][k] * B[k][j])
  *
- * IMPORTANT: Handles aliasing safely - if out === a or out === b, uses internal
- * scratch buffer to compute result before copying to out.
+ * Overlapping input and output views use a scratch matrix.
  *
  * OPT-MAT-1: Specialized unrolled path for 4x4 matrices (most common case)
  *
  * @param out - Pre-allocated output matrix. Modified in place.
  * @param a - First matrix
  * @param b - Second matrix
- * @throws {Error} If matrix dimensions are incompatible (DEV only)
- * @note Validation is DEV-only for performance in production hot paths
+ * @throws {Error} If matrix dimensions are incompatible
  */
 export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): void {
   const len = a.length
 
-  if (import.meta.env.DEV) {
-    if (len === 0) throw new Error('Cannot multiply empty matrices')
-    if (len !== b.length || len !== out.length) {
-      throw new Error('Matrix dimensions incompatible')
-    }
-  }
+  if (len === 0) throw new Error('Cannot multiply empty matrices')
+  if (len !== b.length || len !== out.length) throw new Error('Matrix dimensions incompatible')
 
-  const isAliased = out === a || out === b
+  const isAliased = viewsOverlap(out, a) || viewsOverlap(out, b)
 
   // OPT-MAT-1: Fast path for 4×4 matrices (most common case in 4D visualization)
   if (len === 16) {
@@ -306,18 +279,6 @@ export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): v
   if (isAliased) out.set(target)
 }
 
-/**
- * Multiplies a matrix by a vector
- * Formula: b[i] = Σ(M[i][j] * v[j])
- *
- * Uses WASM acceleration when available for improved performance.
- *
- * @param m - Matrix (n×n)
- * @param v - Vector (n)
- * @param out
- * @returns Result vector (n)
- * @throws {Error} If dimensions are incompatible
- */
 /**
  * Attempts WASM-accelerated matrix-vector multiplication.
  *
@@ -424,9 +385,25 @@ export function transposeMatrix(m: MatrixND): MatrixND {
   return result
 }
 
+/** Move the largest remaining column entry to the diagonal and return the swap sign. */
+function pivotDeterminantColumn(work: Float64Array, dim: number, col: number): number {
+  let pivotRow = col
+  for (let row = col + 1; row < dim; row++) {
+    if (Math.abs(work[row * dim + col]!) > Math.abs(work[pivotRow * dim + col]!)) pivotRow = row
+  }
+  if (pivotRow === col) return 1
+  for (let j = col; j < dim; j++) {
+    const i = col * dim + j
+    const k = pivotRow * dim + j
+    const tmp = work[i]!
+    work[i] = work[k]!
+    work[k] = tmp
+  }
+  return -1
+}
+
 /**
- * Computes the determinant of a square matrix using recursive Laplace expansion
- * Formula: det(A) = Σ((-1)^(i+j) * A[i][j] * det(minor[i][j]))
+ * Computes the determinant by Gaussian elimination with partial pivoting.
  * @param m - Square matrix
  * @returns The determinant
  * @throws {Error} If matrix is not square
@@ -438,56 +415,36 @@ export function determinant(m: MatrixND): number {
   }
 
   const dim = squareDimensionFromLength(len)
-  if (dim > MAX_DETERMINANT_DIMENSION) {
-    throw new Error(
-      `determinant: dimension ${dim} exceeds recursive limit ${MAX_DETERMINANT_DIMENSION}`
-    )
-  }
+  if (dim === 1) return m[0]!
+  if (dim === 2) return m[0]! * m[3]! - m[1]! * m[2]!
 
-  // Base cases
-  if (dim === 1) {
-    return m[0]!
-  }
-
-  if (dim === 2) {
-    return m[0]! * m[3]! - m[1]! * m[2]!
-  }
-
-  // Recursive case: Laplace expansion along first row
-  let det = 0
-  for (let j = 0; j < dim; j++) {
-    const minor = getMinor(m, 0, j)
-    const cofactor = (j % 2 === 0 ? 1 : -1) * m[j]! * determinant(minor)
-    det += cofactor
-  }
-
-  return det
-}
-
-/**
- * Gets the minor matrix by removing specified row and column
- * @param m - Input matrix
- * @param row - Row to remove
- * @param col - Column to remove
- * @returns Minor matrix
- */
-function getMinor(m: MatrixND, row: number, col: number): MatrixND {
-  const len = m.length
-  const dim = squareDimensionFromLength(len)
-  const minorDim = dim - 1
-  const minor = new Float32Array(minorDim * minorDim)
-
-  let minorIdx = 0
-  for (let i = 0; i < dim; i++) {
-    if (i === row) continue
-    const rowOffset = i * dim
-    for (let j = 0; j < dim; j++) {
-      if (j === col) continue
-      minor[minorIdx++] = m[rowOffset + j]!
+  const work = new Float64Array(m)
+  let sign = 1
+  for (let col = 0; col < dim; col++) {
+    sign *= pivotDeterminantColumn(work, dim, col)
+    const pivot = work[col * dim + col]!
+    if (pivot === 0) return 0
+    for (let row = col + 1; row < dim; row++) {
+      const factor = work[row * dim + col]! / pivot
+      for (let j = col + 1; j < dim; j++) work[row * dim + j]! -= factor * work[col * dim + j]!
     }
   }
 
-  return minor
+  // Keep an integer binary exponent so large pivots can cancel small ones.
+  let mantissa = sign
+  let exponent = 0
+  for (let i = 0; i < dim; i++) {
+    const pivot = work[i * dim + i]!
+    const e = Math.floor(Math.log2(Math.abs(pivot)))
+    mantissa *= pivot / 2 ** e
+    exponent += e
+    if (Math.abs(mantissa) >= 2) {
+      mantissa *= 0.5
+      exponent++
+    }
+  }
+  if (exponent < -1022) return mantissa * 2 ** (exponent + 1022) * 2 ** -1022
+  return mantissa * 2 ** exponent
 }
 
 /**
@@ -503,7 +460,7 @@ export function matricesEqual(a: MatrixND, b: MatrixND, epsilon = EPSILON): bool
   }
 
   for (let i = 0; i < a.length; i++) {
-    if (Math.abs(a[i]! - b[i]!) >= epsilon) {
+    if (a[i] !== b[i] && !(Math.abs(a[i]! - b[i]!) < epsilon)) {
       return false
     }
   }

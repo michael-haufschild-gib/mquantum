@@ -7,16 +7,17 @@
  * Run: pnpm exec vitest bench --run src/tests/rendering/webgpu/shaderCompositionPerf.bench
  */
 
-import { bench, describe } from 'vitest'
+import { describe } from 'vitest'
 
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
+import { benchmark } from '@/tests/benchmark'
 
 describe('Shader composition performance', () => {
-  bench('composeSchroedingerShader HO 3D', () => {
+  benchmark('composeSchroedingerShader HO 3D', () => {
     composeSchroedingerShader({ dimension: 3, quantumMode: 'harmonicOscillator' })
   })
 
-  bench('composeSchroedingerShader HO 5D (8 terms, cached)', () => {
+  benchmark('composeSchroedingerShader HO 5D (8 terms, cached)', () => {
     composeSchroedingerShader({
       dimension: 5,
       quantumMode: 'harmonicOscillator',
@@ -25,15 +26,15 @@ describe('Shader composition performance', () => {
     })
   })
 
-  bench('composeSchroedingerShader Hydrogen 7D', () => {
+  benchmark('composeSchroedingerShader Hydrogen 7D', () => {
     composeSchroedingerShader({ dimension: 7, quantumMode: 'hydrogenND' })
   })
 
-  bench('composeSchroedingerShader Hydrogen 11D coupled', () => {
+  benchmark('composeSchroedingerShader Hydrogen 11D coupled', () => {
     composeSchroedingerShader({ dimension: 11, quantumMode: 'hydrogenNDCoupled' })
   })
 
-  bench('composeSchroedingerShader HO 3D isosurface + cache', () => {
+  benchmark('composeSchroedingerShader HO 3D isosurface + cache', () => {
     composeSchroedingerShader({
       dimension: 3,
       quantumMode: 'harmonicOscillator',
@@ -44,7 +45,7 @@ describe('Shader composition performance', () => {
   })
 
   // Also measure output size
-  bench('composeSchroedingerShader HO 3D (measure output)', () => {
+  benchmark('composeSchroedingerShader HO 3D (measure output)', () => {
     const result = composeSchroedingerShader({ dimension: 3, quantumMode: 'harmonicOscillator' })
     // Side effect to prevent dead code elimination
     if (result.wgsl.length < 0) throw new Error('unreachable')

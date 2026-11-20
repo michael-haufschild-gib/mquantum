@@ -1300,26 +1300,24 @@ export default [
 
       // Strict additions: catch superfluous patterns AI tends to over-generate
       '@eslint-react/no-class-component': 'error',
-      '@eslint-react/no-useless-fragment': 'error',
+      '@eslint-react/jsx-no-useless-fragment': 'error',
 
       // Web API leaks: GPU app has RAF loops, resize observers, interval-based animation —
       // missing cleanup is a silent perf bug
-      '@eslint-react/web-api/no-leaked-event-listener': 'error',
-      '@eslint-react/web-api/no-leaked-interval': 'error',
-      '@eslint-react/web-api/no-leaked-resize-observer': 'error',
-      '@eslint-react/web-api/no-leaked-timeout': 'error',
+      '@eslint-react/web-api-no-leaked-event-listener': 'error',
+      '@eslint-react/web-api-no-leaked-interval': 'error',
+      '@eslint-react/web-api-no-leaked-resize-observer': 'error',
+      '@eslint-react/web-api-no-leaked-timeout': 'error',
 
       // DOM safety from strict
-      '@eslint-react/dom/no-missing-button-type': 'error',
-      '@eslint-react/dom/no-unsafe-target-blank': 'error',
+      '@eslint-react/dom-no-missing-button-type': 'error',
+      '@eslint-react/dom-no-unsafe-target-blank': 'error',
 
       // Warn-level: real quality signals but not outright bugs
-      '@eslint-react/no-unnecessary-use-callback': 'warn',
-      '@eslint-react/no-unnecessary-use-memo': 'warn',
       '@eslint-react/purity': 'warn',
 
       // Disable inapplicable rules: this is a Vite SPA, hooks-only, React 19
-      '@eslint-react/rsc/function-definition': 'off', // not a React Server Components project
+      '@eslint-react/rsc-function-definition': 'off', // not a React Server Components project
       '@eslint-react/no-use-context': 'off',          // using useContext directly is fine
       '@eslint-react/no-context-provider': 'off',     // React 19 <Ctx> syntax is opt-in
       '@eslint-react/no-forward-ref': 'off',          // forwardRef is legitimate in this codebase
@@ -1331,7 +1329,7 @@ export default [
       // conditionally guarded. Scoping to 40 individual file overrides would add config
       // noise without catching bugs; the pattern is architecturally pervasive here.
       '@eslint-react/set-state-in-effect': 'off',
-      '@eslint-react/naming-convention/ref-name': 'off',  // cosmetic; large existing ref surface
+      '@eslint-react/naming-convention-ref-name': 'off',  // cosmetic; large existing ref surface
       '@eslint-react/use-state': 'off',                   // setter naming convention is cosmetic
 
       // JSDoc
@@ -1496,9 +1494,6 @@ export default [
   {
     files: ['src/tests/**/*.{ts,tsx}'],
     rules: {
-      '@eslint-react/component-hook-factories': 'off',
-      '@eslint-react/no-unnecessary-use-callback': 'off',
-      '@eslint-react/no-unnecessary-use-memo': 'off',
       '@eslint-react/purity': 'off',
       'no-console': 'off',
     },

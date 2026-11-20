@@ -13,33 +13,6 @@
 pub(crate) const MIN_SAFE_DISTANCE: f64 = 0.01;
 
 // ============================================================================
-// Fast Trigonometry (OPT-WASM-RUST-TRIG)
-// ============================================================================
-
-const PI: f64 = std::f64::consts::PI;
-const TAU: f64 = PI * 2.0;
-const PI_SQ_INV_4: f64 = 4.0 / (PI * PI);
-
-/// Fast sine approximation using parabolic formula.
-/// ~3x faster than std sin(), max error ~1.2% at x ≈ ±0.7.
-/// Matches JS fsin() in trig.ts for consistent animation behavior.
-#[inline(always)]
-fn fsin(x: f64) -> f64 {
-    // Normalize to [-PI, PI]
-    let x = ((x % TAU) + TAU + PI) % TAU - PI;
-    // Parabolic approximation: y = x * (PI - |x|) * 4/PI²
-    let y = x * (PI - x.abs()) * PI_SQ_INV_4;
-    // Clamp to [-1, 1]
-    y.clamp(-1.0, 1.0)
-}
-
-/// Fast cosine approximation using cos(x) = sin(x + π/2).
-#[inline(always)]
-fn fcos(x: f64) -> f64 {
-    fsin(x + PI * 0.5)
-}
-
-// ============================================================================
 // Matrix Operations
 // ============================================================================
 
@@ -138,40 +111,22 @@ fn multiply_matrices_into(out: &mut [f64], a: &[f64], b: &[f64], dimension: usiz
 // `multiply_matrices_into` above dispatches to those functions; see that module's
 // doc-comment for the rationale of the split.
 
-/// Resets a matrix to identity in-place
-fn reset_to_identity(matrix: &mut [f64], dimension: usize) {
-    matrix.fill(0.0);
+fn identity_matrix(dimension: usize) -> Vec<f64> {
+    let mut matrix = vec![0.0; dimension * dimension];
     for i in 0..dimension {
         matrix[i * dimension + i] = 1.0;
     }
+    matrix
 }
 
-/// Creates a rotation matrix for a specific plane
-///
-/// # Arguments
-/// * `out` - Output buffer (dimension × dimension)
-/// * `dimension` - Matrix dimension
-/// * `plane_index1` - First axis of rotation plane
-/// * `plane_index2` - Second axis of rotation plane
-/// * `angle_radians` - Rotation angle
-fn create_rotation_matrix_into(
-    out: &mut [f64],
-    dimension: usize,
-    plane_index1: usize,
-    plane_index2: usize,
-    angle_radians: f64,
-) {
-    reset_to_identity(out, dimension);
-
-    // OPT-WASM-RUST-TRIG: Use fast trig for animation performance
-    let cos = fcos(angle_radians);
-    let sin = fsin(angle_radians);
-
-    // Set rotation plane elements
-    out[plane_index1 * dimension + plane_index1] = cos;
-    out[plane_index2 * dimension + plane_index2] = cos;
-    out[plane_index1 * dimension + plane_index2] = -sin;
-    out[plane_index2 * dimension + plane_index1] = sin;
+/// Right-multiply by a plane rotation in place, changing only its two columns.
+fn rotate_columns(matrix: &mut [f64], dimension: usize, a: usize, b: usize, angle: f64) {
+    let (sin, cos) = angle.sin_cos();
+    for row in matrix.chunks_exact_mut(dimension) {
+        let (x, y) = (row[a], row[b]);
+        row[a] = cos * x + sin * y;
+        row[b] = cos * y - sin * x;
+    }
 }
 
 /// Axis names for plane parsing. Mirrors `src/constants/dimension.ts`.
@@ -285,27 +240,7 @@ fn parse_plane_name_extended(plane_name: &str) -> Option<(usize, usize)> {
 /// # Returns
 /// Flat rotation matrix (dimension × dimension) as row-major array
 pub fn compose_rotations(dimension: usize, plane_names: &[String], angles: &[f64]) -> Vec<f64> {
-    let matrix_size = dimension * dimension;
-
-    // Handle empty rotations
-    if plane_names.is_empty() || angles.is_empty() {
-        let mut result = vec![0.0; matrix_size];
-        reset_to_identity(&mut result, dimension);
-        return result;
-    }
-
-    // Allocate scratch buffers
-    let mut rotation = vec![0.0; matrix_size];
-    let mut result_a = vec![0.0; matrix_size];
-    let mut result_b = vec![0.0; matrix_size];
-
-    // Start with identity
-    reset_to_identity(&mut result_a, dimension);
-
-    let mut current = &mut result_a;
-    let mut next = &mut result_b;
-
-    // Apply each rotation
+    let mut current = identity_matrix(dimension);
     for (plane_name, &angle) in plane_names.iter().zip(angles.iter()) {
         // Parse plane name to get indices
         let Some((idx1, idx2)) = parse_plane_name(plane_name) else {
@@ -317,18 +252,10 @@ pub fn compose_rotations(dimension: usize, plane_names: &[String], angles: &[f64
             continue;
         }
 
-        // Create rotation matrix
-        create_rotation_matrix_into(&mut rotation, dimension, idx1, idx2, angle);
-
-        // Multiply: next = current * rotation
-        multiply_matrices_into(next, current, &rotation, dimension);
-
-        // Swap references
-        std::mem::swap(&mut current, &mut next);
+        rotate_columns(&mut current, dimension, idx1, idx2, angle);
     }
 
-    // Copy result to output
-    current.clone()
+    current
 }
 
 /// Composes multiple rotations from flattened plane indices and angles.
@@ -350,32 +277,12 @@ pub fn compose_rotations_indexed(
     angles: &[f64],
     rotation_count: usize,
 ) -> Vec<f64> {
-    let matrix_size = dimension * dimension;
-
     // Clamp count to valid payload size to support over-provisioned pooled buffers.
     let usable_count = rotation_count
         .min(angles.len())
         .min(plane_indices.len() / 2);
 
-    // Handle empty rotations
-    if usable_count == 0 {
-        let mut result = vec![0.0; matrix_size];
-        reset_to_identity(&mut result, dimension);
-        return result;
-    }
-
-    // Allocate scratch buffers
-    let mut rotation = vec![0.0; matrix_size];
-    let mut result_a = vec![0.0; matrix_size];
-    let mut result_b = vec![0.0; matrix_size];
-
-    // Start with identity
-    reset_to_identity(&mut result_a, dimension);
-
-    let mut current = &mut result_a;
-    let mut next = &mut result_b;
-
-    // Apply each rotation
+    let mut current = identity_matrix(dimension);
     for i in 0..usable_count {
         let pair_offset = i * 2;
         let idx1 = plane_indices[pair_offset] as usize;
@@ -391,18 +298,10 @@ pub fn compose_rotations_indexed(
             (idx2, idx1)
         };
 
-        // Create rotation matrix
-        create_rotation_matrix_into(&mut rotation, dimension, axis_a, axis_b, angles[i]);
-
-        // Multiply: next = current * rotation
-        multiply_matrices_into(next, current, &rotation, dimension);
-
-        // Swap references
-        std::mem::swap(&mut current, &mut next);
+        rotate_columns(&mut current, dimension, axis_a, axis_b, angles[i]);
     }
 
-    // Copy result to output
-    current.clone()
+    current
 }
 
 // ============================================================================
@@ -582,106 +481,6 @@ mod tests {
     }
 
     // ========================================================================
-    // fsin / fcos — Fast Trig Approximation Tests
-    // ========================================================================
-
-    #[test]
-    fn test_fsin_exact_points() {
-        // fsin is exact at 0, ±PI/2, ±PI by construction
-        assert!((fsin(0.0)).abs() < 1e-15);
-        assert!((fsin(PI / 2.0) - 1.0).abs() < 1e-15);
-        assert!((fsin(-PI / 2.0) + 1.0).abs() < 1e-15);
-        assert!((fsin(PI)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_fcos_exact_points() {
-        assert!((fcos(0.0) - 1.0).abs() < 1e-15);
-        assert!((fcos(PI) + 1.0).abs() < 1e-10);
-        assert!((fcos(PI / 2.0)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_fsin_accuracy_across_full_cycle() {
-        // Parabolic approximation max error is ~0.0561
-        let steps = 3600;
-        let mut max_err: f64 = 0.0;
-        for i in 0..=steps {
-            let angle = (i as f64 / steps as f64) * TAU - PI;
-            let approx = fsin(angle);
-            let exact = angle.sin();
-            let err = (approx - exact).abs();
-            max_err = max_err.max(err);
-            assert!(
-                err < 0.057,
-                "fsin({angle}) = {approx}, expected {exact}, error {err}"
-            );
-        }
-        // Verify the max error is in the expected ballpark
-        assert!(max_err > 0.05, "Suspiciously low max error: {max_err}");
-    }
-
-    #[test]
-    fn test_fcos_accuracy_across_full_cycle() {
-        let steps = 3600;
-        let mut max_err: f64 = 0.0;
-        for i in 0..=steps {
-            let angle = (i as f64 / steps as f64) * TAU - PI;
-            let approx = fcos(angle);
-            let exact = angle.cos();
-            let err = (approx - exact).abs();
-            max_err = max_err.max(err);
-            assert!(
-                err < 0.057,
-                "fcos({angle}) = {approx}, expected {exact}, error {err}"
-            );
-        }
-        assert!(max_err > 0.05, "Suspiciously low max error: {max_err}");
-    }
-
-    #[test]
-    fn test_fsin_is_odd() {
-        for i in 0..1000 {
-            let x = (i as f64 - 500.0) * 0.01;
-            assert!(
-                (fsin(-x) + fsin(x)).abs() < 1e-10,
-                "fsin is not odd at x={x}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_fcos_is_even() {
-        for i in 0..1000 {
-            let x = (i as f64 - 500.0) * 0.01;
-            assert!(
-                (fcos(-x) - fcos(x)).abs() < 1e-10,
-                "fcos is not even at x={x}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_fsin_fcos_clamped_to_unit_range() {
-        for i in 0..10000 {
-            let x = (i as f64 - 5000.0) * 0.1;
-            let s = fsin(x);
-            let c = fcos(x);
-            assert!(s >= -1.0 && s <= 1.0, "fsin({x}) = {s} out of [-1,1]");
-            assert!(c >= -1.0 && c <= 1.0, "fcos({x}) = {c} out of [-1,1]");
-        }
-    }
-
-    #[test]
-    fn test_fsin_large_input_normalization() {
-        // Large inputs should be normalized to [-PI, PI] without NaN/Inf
-        let x = 100.0 * PI + PI / 2.0;
-        let result = fsin(x);
-        assert!(result.is_finite());
-        assert!((result - x.sin()).abs() < 0.056);
-    }
-
-    // ========================================================================
     // Unrolled Matrix Multiplication — Specialized vs Generic Path
     // ========================================================================
 
@@ -829,11 +628,7 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_compose_rotations_near_orthogonal_all_dims() {
-        // compose_rotations uses fsin/fcos (fast parabolic approximation).
-        // Since fsin²+fcos² deviates from 1 by up to 12.5%, the resulting
-        // rotation matrices are only approximately orthogonal.
-        // R^T * R ≈ I within the Pythagorean error bound.
+    fn test_compose_rotations_orthogonal_all_dims() {
         for dim in 2..=11 {
             let plane_names = vec!["XY".to_string()];
             let angles = vec![0.7];
@@ -854,7 +649,7 @@ mod tests {
                 for j in 0..dim {
                     let expected = if i == j { 1.0 } else { 0.0 };
                     assert!(
-                        (rt_r[i * dim + j] - expected).abs() < 0.15,
+                        (rt_r[i * dim + j] - expected).abs() < 1e-12,
                         "R^T*R deviation too large at dim={dim}, [{i}][{j}]: got {}",
                         rt_r[i * dim + j]
                     );
@@ -877,7 +672,6 @@ mod tests {
             assert!(val.abs() < 2.0, "Rotation matrix entry too large: {val}");
         }
 
-        // Near-orthogonal check with loose tolerance for fsin/fcos
         let mut rt_r = vec![0.0; 16];
         for i in 0..4 {
             for j in 0..4 {
@@ -892,7 +686,7 @@ mod tests {
             for j in 0..4 {
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
-                    (rt_r[i * 4 + j] - expected).abs() < 0.25,
+                    (rt_r[i * 4 + j] - expected).abs() < 1e-12,
                     "Multi-plane R^T*R too far from identity at [{i}][{j}]: got {}",
                     rt_r[i * 4 + j]
                 );
@@ -901,9 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compose_rotations_preserves_vector_length_approx() {
-        // With fsin/fcos, length preservation is approximate.
-        // The ~12.5% Pythagorean identity error means length can change by ~6%.
+    fn test_compose_rotations_preserves_vector_length() {
         let plane_names = vec!["XY".to_string(), "XW".to_string()];
         let angles = vec![1.0, 0.5];
         let r = compose_rotations(4, &plane_names, &angles);
@@ -914,7 +706,7 @@ mod tests {
         let orig_mag = magnitude(&v);
         let rot_mag = magnitude(&rotated);
         assert!(
-            (orig_mag - rot_mag).abs() / orig_mag < 0.1,
+            (orig_mag - rot_mag).abs() / orig_mag < 1e-12,
             "Rotation changed vector length too much: {orig_mag} -> {rot_mag}"
         );
     }

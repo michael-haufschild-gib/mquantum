@@ -58,7 +58,6 @@ export interface UseConditionalMsgBoxResult {
  * ```
  */
 // Module-level stable functions — no component scope dependencies, so useCallback is unnecessary.
-// Defined here (not inline in the hook) to satisfy @eslint-react/no-unnecessary-use-callback.
 
 function showOnce(
   dialogId: string,

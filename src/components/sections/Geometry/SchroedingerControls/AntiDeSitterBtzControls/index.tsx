@@ -87,7 +87,7 @@ export const AntiDeSitterBtzControls: React.FC<{ ads: AntiDeSitterConfig }> = Re
             />
             <Slider
               label="Frequency ω"
-              tooltip="Scalar-mode angular frequency ω in 1/L units. Sets the reference energy for the Tolman-redshifted Bose population."
+              tooltip="Fixed local probe frequency in 1/L units. Occupation depends on the local Tolman temperature."
               min={ADS_LIMITS.btzOmegaMin}
               max={ADS_LIMITS.btzOmegaMax}
               step={0.01}

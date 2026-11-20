@@ -8,8 +8,7 @@
 import { AXIS_LABELS } from '@/constants/dimension'
 import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
 
-import { copyMatrix, createIdentityMatrix, multiplyMatricesInto } from './matrix'
-import { fcos, fsin } from './trig'
+import { createIdentityMatrix } from './matrix'
 import type { MatrixND, RotationPlane } from './types'
 
 /**
@@ -37,38 +36,6 @@ function assertFiniteAngle(angleRadians: number): void {
 }
 
 /**
- * Module-level scratch matrices for rotation composition
- * Avoids allocation during 60fps animation loops.
- * Uses swap-based composition: resultA and resultB alternate as current/next.
- */
-const scratchMatrices = new Map<
-  number,
-  { rotation: MatrixND; resultA: MatrixND; resultB: MatrixND }
->()
-
-/**
- * Gets or creates scratch matrices for a given dimension
- * @param dimension - The dimensionality of the space
- * @returns Scratch matrices for rotation and two result buffers for swap-based composition
- */
-function getScratchMatrices(dimension: number): {
-  rotation: MatrixND
-  resultA: MatrixND
-  resultB: MatrixND
-} {
-  let scratch = scratchMatrices.get(dimension)
-  if (!scratch) {
-    scratch = {
-      rotation: createIdentityMatrix(dimension),
-      resultA: createIdentityMatrix(dimension),
-      resultB: createIdentityMatrix(dimension),
-    }
-    scratchMatrices.set(dimension, scratch)
-  }
-  return scratch
-}
-
-/**
  * Resets a matrix to identity in-place
  * @param matrix - Matrix to reset
  * @param dimension - Matrix dimension
@@ -80,36 +47,24 @@ function resetToIdentity(matrix: MatrixND, dimension: number): void {
   }
 }
 
-/**
- * Creates a rotation matrix directly into an output buffer
- * Avoids allocation when called in hot paths
- * @param out - Output matrix buffer (must be dimension * dimension)
- * @param dimension - Matrix dimension
- * @param planeIndex1 - First axis of the rotation plane
- * @param planeIndex2 - Second axis of the rotation plane
- * @param angleRadians - Rotation angle in radians
- */
-function createRotationMatrixInto(
-  out: MatrixND,
+/** Right-multiply by a plane rotation. Only the two selected columns change. */
+function rotateColumns(
+  matrix: MatrixND,
   dimension: number,
-  planeIndex1: number,
-  planeIndex2: number,
-  angleRadians: number
+  axis1: number,
+  axis2: number,
+  angle: number
 ): void {
-  // Reset to identity
-  resetToIdentity(out, dimension)
-
-  // Use fast trig approximation for animation performance
-  // Precision is not critical for visual rotation - smooth motion matters
-  const cos = fcos(angleRadians)
-  const sin = fsin(angleRadians)
-
-  // Set rotation plane elements
-  // out[i * dimension + j]
-  out[planeIndex1 * dimension + planeIndex1] = cos
-  out[planeIndex2 * dimension + planeIndex2] = cos
-  out[planeIndex1 * dimension + planeIndex2] = -sin
-  out[planeIndex2 * dimension + planeIndex1] = sin
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  for (let row = 0; row < dimension; row++) {
+    const i = row * dimension + axis1
+    const j = row * dimension + axis2
+    const x = matrix[i]!
+    const y = matrix[j]!
+    matrix[i] = cos * x + sin * y
+    matrix[j] = cos * y - sin * x
+  }
 }
 
 /**
@@ -149,14 +104,7 @@ export function createRotationMatrix(
   }
 
   const matrix = createIdentityMatrix(dimension)
-  const cos = fcos(angleRadians)
-  const sin = fsin(angleRadians)
-
-  matrix[planeIndex1 * dimension + planeIndex1] = cos
-  matrix[planeIndex2 * dimension + planeIndex2] = cos
-  matrix[planeIndex1 * dimension + planeIndex2] = -sin
-  matrix[planeIndex2 * dimension + planeIndex1] = sin
-
+  rotateColumns(matrix, dimension, planeIndex1, planeIndex2, angleRadians)
   return matrix
 }
 
@@ -253,19 +201,6 @@ function getAxisName(index: number): string {
 }
 
 /**
- * Composes multiple rotations from a map of plane names to angles
- * Rotations are applied in the order they appear when iterating the map
- *
- * Uses WASM acceleration when available, otherwise falls back to
- * swap-based composition with pre-allocated scratch buffers.
- *
- * @param dimension - The dimensionality of the space
- * @param angles - Map from plane name (e.g., "XY", "XW") to angle in radians
- * @param out - Optional output matrix to avoid allocation (must be dimension * dimension)
- * @returns The composed rotation matrix
- * @throws {Error} If invalid plane names are provided (DEV only)
- */
-/**
  * Validates and resolves a plane name + angle pair. Returns resolved indices or null to skip.
  *
  * @param planeName - Rotation plane name (e.g. "XY")
@@ -336,48 +271,11 @@ function tryWasmCompose(
 }
 
 /**
- * JS fallback for rotation composition using swap-based scratch buffers.
- *
- * @param result - Output matrix
- * @param dimension - Dimensionality of the space
- * @param angles - Map from plane name to angle in radians
- * @param planeIndices - Lookup map from plane name to axis index pair
- */
-function jsCompose(
-  result: MatrixND,
-  dimension: number,
-  angles: Map<string, number>,
-  planeIndices: Map<string, [number, number]>
-): void {
-  const scratch = getScratchMatrices(dimension)
-
-  // Initialize swap buffers: start with identity in resultA
-  resetToIdentity(scratch.resultA, dimension)
-  let current = scratch.resultA
-  let next = scratch.resultB
-
-  for (const [planeName, angle] of angles.entries()) {
-    const indices = resolveRotationEntry(planeName, angle, planeIndices, dimension)
-    if (!indices) continue
-
-    createRotationMatrixInto(scratch.rotation, dimension, indices[0], indices[1], angle)
-    multiplyMatricesInto(next, current, scratch.rotation)
-
-    // Swap references for next iteration
-    const temp = current
-    current = next
-    next = temp
-  }
-
-  copyMatrix(current, result)
-}
-
-/**
  * Composes multiple rotations from a map of plane names to angles.
- * Rotations are applied in the order they appear when iterating the map.
+ * Forms the matrix product in map iteration order. The rightmost factor acts first on a column vector.
  *
  * Uses WASM acceleration when available, otherwise falls back to
- * swap-based composition with pre-allocated scratch buffers.
+ * in-place plane rotations.
  *
  * @param dimension - The dimensionality of the space
  * @param angles - Map from plane name (e.g., "XY", "XW") to angle in radians
@@ -414,7 +312,10 @@ export function composeRotations(
   // Try WASM path if available, then JS fallback
   if (!isAnimationWasmReady() || !tryWasmCompose(result, dimension, angles, planeIndices)) {
     if (out) resetToIdentity(result, dimension)
-    jsCompose(result, dimension, angles, planeIndices)
+    for (const [name, angle] of angles) {
+      const axes = resolveRotationEntry(name, angle, planeIndices, dimension)
+      if (axes) rotateColumns(result, dimension, axes[0], axes[1], angle)
+    }
   }
 
   return result

@@ -7,7 +7,7 @@
  *
  * Skipped in the default Playwright run (tagged `@wgsl-tint`). Invoke with:
  *   pnpm test:shaders:tint              # curated ~500
- *   pnpm test:shaders:tint -- --grep ... # override
+ *   pnpm test:shaders:tint --grep ... # override
  *
  * Bugs caught: Chrome-Tint-only shader-module rejections (syntax/type-system
  * differences, storage-texture format nuances, `textureSample` placement

@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/vitest'
 // Custom domain-specific matchers (WGSL, quantum physics, vectors)
 import './matchers'
 

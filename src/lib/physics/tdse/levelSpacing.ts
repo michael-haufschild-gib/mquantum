@@ -1,9 +1,8 @@
 /**
  * Level Spacing Statistics for Quantum Eigenvalue Spectra
  *
- * Computes nearest-neighbor level spacing distributions and classifies
- * quantum systems as integrable (Poisson), chaotic (Wigner-Dyson/GOE),
- * or intermediate (Anderson-localized near mobility edge).
+ * Fits the Brody family to mean-normalized nearest-neighbor level spacings.
+ * The classification describes the fit to the observed gaps.
  *
  * The Brody parameter β interpolates between:
  *   β = 0: Poisson distribution P(s) = exp(-s) — integrable / localized
@@ -33,7 +32,7 @@ export interface LevelSpacingResult {
   /** Brody parameter β ∈ [0, 1]: 0 = Poisson, 1 = Wigner-Dyson */
   brodyBeta: number
   /** Classification based on β thresholds */
-  classification: 'poisson' | 'intermediate' | 'wigner-dyson'
+  classification: 'poisson' | 'intermediate' | 'wigner-dyson' | 'undetermined'
   /** Mean IPR across eigenstates (NaN if no valid IPR data) */
   meanIPR: number
 }
@@ -68,8 +67,8 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
       energies: [...finiteEnergies].sort((a, b) => a - b),
       spacings: [],
       meanSpacing: 0,
-      brodyBeta: 0,
-      classification: 'poisson',
+      brodyBeta: NaN,
+      classification: 'undetermined',
       meanIPR,
     }
   }
@@ -83,39 +82,23 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
   // ── JS fallback ─────────────────────────────────────────────────────
   const sorted = [...finiteEnergies].sort((a, b) => a - b)
 
-  // Nearest-neighbor spacings
-  const rawSpacings: number[] = []
-  let hasInvalidSpacing = false
-  for (let i = 1; i < sorted.length; i++) {
-    const spacing = sorted[i]! - sorted[i - 1]!
-    if (!Number.isFinite(spacing) || spacing < 0) {
-      rawSpacings.push(0)
-      hasInvalidSpacing = true
-    } else {
-      rawSpacings.push(spacing)
-    }
-  }
+  // The gaps telescope to the spectral width. Halve the endpoints only
+  // when their difference overflows, and unfold before the mean can underflow.
+  const last = sorted.length - 1
+  const scale = Number.isFinite(sorted[last]! - sorted[0]!) ? 1 : 0.5
+  const width = sorted[last]! * scale - sorted[0]! * scale
+  const meanSpacing = width / last / scale
+  const spacings = sorted
+    .slice(1)
+    .map((energy, i) => (width === 0 ? 0 : ((energy * scale - sorted[i]! * scale) / width) * last))
 
-  // Unfolding: normalize by mean spacing
-  const meanSpacing = rawSpacings.reduce((a, b) => a + b, 0) / rawSpacings.length
-  if (hasInvalidSpacing || !Number.isFinite(meanSpacing) || meanSpacing <= 0) {
-    return {
-      energies: sorted,
-      spacings: rawSpacings,
-      meanSpacing: Number.isFinite(meanSpacing) ? meanSpacing : 0,
-      brodyBeta: 0,
-      classification: 'poisson',
-      meanIPR,
-    }
-  }
-  const spacings = rawSpacings.map((s) => s / meanSpacing)
-
-  // Brody parameter fit via maximum likelihood
-  const brodyBeta = fitBrodyParameter(spacings)
+  // Fit the Brody CDF to the unfolded spacings.
+  const brodyBeta = width > 0 ? fitBrodyParameter(spacings) : NaN
 
   // Classification thresholds
   let classification: LevelSpacingResult['classification']
-  if (brodyBeta < 0.3) classification = 'poisson'
+  if (!Number.isFinite(brodyBeta)) classification = 'undetermined'
+  else if (brodyBeta < 0.3) classification = 'poisson'
   else if (brodyBeta > 0.7) classification = 'wigner-dyson'
   else classification = 'intermediate'
 
@@ -130,8 +113,8 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
 }
 
 function computeMeanFinite(values: number[] | undefined): number {
-  const finite = values?.filter(isValidParticipationCount) ?? []
-  return finite.length > 0 ? finite.reduce((a, b) => a + b, 0) / finite.length : NaN
+  if (!values?.length) return NaN
+  return values.reduce((mean, value, i) => mean + (value - mean) / (i + 1), 0)
 }
 
 function isValidParticipationCount(value: number | undefined): value is number {
@@ -155,7 +138,7 @@ function isValidParticipationCount(value: number | undefined): value is number {
  * @returns Brody parameter β ∈ [0, 1]
  */
 function fitBrodyParameter(spacings: number[]): number {
-  if (spacings.length < 2) return 0
+  if (spacings.length < 2) return NaN
 
   // Sort spacings for CDF comparison
   const sorted = [...spacings].sort((a, b) => a - b)
@@ -208,10 +191,8 @@ function ksStatistic(sorted: number[], n: number, beta: number): number {
 
   let maxD = 0
   for (let i = 0; i < n; i++) {
-    const empirical = (i + 1) / n
-    const theoretical = 1 - Math.exp(-b * Math.pow(sorted[i]!, bp1))
-    const d = Math.abs(empirical - theoretical)
-    if (d > maxD) maxD = d
+    const theoretical = -Math.expm1(-b * Math.pow(sorted[i]!, bp1))
+    maxD = Math.max(maxD, theoretical - i / n, (i + 1) / n - theoretical)
   }
   return maxD
 }
@@ -277,6 +258,7 @@ const CLASSIFICATION_MAP: LevelSpacingResult['classification'][] = [
   'poisson',
   'intermediate',
   'wigner-dyson',
+  'undetermined',
 ]
 
 /**
@@ -306,24 +288,23 @@ function tryLevelSpacingWasm(energies: number[], meanIPR: number): LevelSpacingR
 
   const brodyBeta = packed[numSpacings]!
   const meanSpacing = packed[numSpacings + 1]!
-  const classificationCode = Math.round(packed[numSpacings + 2]!)
+  const classificationCode = packed[numSpacings + 2]!
+  const classification = CLASSIFICATION_MAP[classificationCode]
 
   // Validate WASM payload values — fall back to JS if corrupt
   if (
-    !Number.isFinite(brodyBeta) ||
+    !classification ||
     !Number.isFinite(meanSpacing) ||
-    meanSpacing <= 0 ||
-    brodyBeta < 0 ||
-    brodyBeta > 1 ||
-    !(classificationCode in CLASSIFICATION_MAP)
+    meanSpacing < 0 ||
+    (classification === 'undetermined'
+      ? !Number.isNaN(brodyBeta)
+      : !(brodyBeta >= 0 && brodyBeta <= 1))
   ) {
     return null
   }
   for (let i = 0; i < numSpacings; i++) {
     if (!Number.isFinite(packed[i]!) || packed[i]! < 0) return null
   }
-
-  const classification = CLASSIFICATION_MAP[classificationCode] ?? 'intermediate'
 
   // Sort energies (same as JS path)
   const sorted = [...energies].sort((a, b) => a - b)

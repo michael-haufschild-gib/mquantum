@@ -203,8 +203,8 @@ function metricAxisWeightAtPosition(
 }
 
 /**
- * Normalize a wavefunction in the same Born measure used for measurement
- * sampling: Σ |ψ|²√|g| for curved metrics, Σ |ψ|² otherwise.
+ * Normalize the collapsed field to the unit norm used by TDSE diagnostics,
+ * Σ |ψ|²√|g| ΔV. The constant cell volume cancels only when sampling.
  */
 export function normalizeWavefunctionInSamplingMeasure(
   psiRe: Float32Array,
@@ -240,6 +240,7 @@ export function normalizeWavefunctionInSamplingMeasure(
     )
     norm += (re * re + im * im) * volumeWeight
   }
+  for (let d = 0; d < latticeDim; d++) norm *= spacing[d]!
   if (!(norm > 0) || !Number.isFinite(norm)) {
     throw new Error('Cannot normalize collapsed wavefunction with zero total probability density')
   }
@@ -248,6 +249,23 @@ export function normalizeWavefunctionInSamplingMeasure(
     psiRe[i] = psiRe[i]! * scale
     psiIm[i] = psiIm[i]! * scale
   }
+}
+
+/** Select the first cumulative mass strictly above a draw in [0, total). */
+function sampleCdfIndex(cdf: Float64Array): number {
+  const total = cdf[cdf.length - 1]!
+  if (!(total > 0) || !Number.isFinite(total)) {
+    throw new Error('Cannot sample from zero total probability density')
+  }
+  const draw = Math.random()
+  let lo = 0
+  let hi = cdf.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (cdf[mid]! / total <= draw) lo = mid + 1
+    else hi = mid
+  }
+  return lo
 }
 
 /**
@@ -303,25 +321,7 @@ export function sampleFromDensity(
     cdf[i] = cumulative
   }
 
-  // Draw uniform random in [0, totalProb)
-  const totalProb = cdf[totalSites - 1]!
-  if (!(totalProb > 0) || !Number.isFinite(totalProb)) {
-    throw new Error('Cannot sample from zero total probability density')
-  }
-  const u = Math.random() * totalProb
-
-  // Binary search for the sampled index
-  let lo = 0
-  let hi = totalSites - 1
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1
-    if (cdf[mid]! < u) {
-      lo = mid + 1
-    } else {
-      hi = mid
-    }
-  }
-  const gridIndex = lo
+  const gridIndex = sampleCdfIndex(cdf)
 
   // Convert linear index to N-D world position
   const position = new Array<number>(latticeDim)
@@ -374,6 +374,7 @@ export function sampleFromMarginalDensity(
   // Compute marginal distribution: sum |psi|^2 over all dimensions except axis
   const marginal = new Float64Array(axisSize)
 
+  const stride = axisStride(gridSize, axis, latticeDim)
   // For each site, extract the axis coordinate and accumulate
   for (let i = 0; i < totalSites; i++) {
     const re = psiRe[i]!
@@ -391,7 +392,7 @@ export function sampleFromMarginalDensity(
     )
 
     // Extract axis coordinate from linear index
-    const axisCoord = extractAxisCoord(i, gridSize, axis, latticeDim)
+    const axisCoord = Math.floor(i / stride) % axisSize
     marginal[axisCoord] = (marginal[axisCoord] ?? 0) + density * volumeWeight
   }
 
@@ -403,30 +404,17 @@ export function sampleFromMarginalDensity(
     cdf[k] = cumulative
   }
 
-  // Sample from marginal CDF
-  const totalProb = cdf[axisSize - 1]!
-  if (!(totalProb > 0) || !Number.isFinite(totalProb)) {
-    throw new Error('Cannot sample from zero total probability density')
-  }
-  const u = Math.random() * totalProb
-
-  let lo = 0
-  let hi = axisSize - 1
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1
-    if (cdf[mid]! < u) {
-      lo = mid + 1
-    } else {
-      hi = mid
-    }
-  }
-  const axisIndex = lo
+  const axisIndex = sampleCdfIndex(cdf)
   const axisPosition = (axisIndex - axisSize * 0.5 + 0.5) * spacing[axis]!
 
+  let marginalDensity = marginal[axisIndex]!
+  for (let d = 0; d < latticeDim; d++) {
+    if (d !== axis) marginalDensity *= spacing[d]!
+  }
   return {
     axisIndex,
     axisPosition,
-    marginalDensity: marginal[axisIndex]!,
+    marginalDensity,
   }
 }
 
@@ -436,7 +424,7 @@ export function sampleFromMarginalDensity(
  * Replaces psi with a narrow Gaussian centered at the measurement position:
  *   psi(x) = exp(-|x - x_meas|^2 / (2 * sigma^2))
  *
- * The result is unnormalized; the TDSE renormalization pass handles normalization.
+ * The caller normalizes the result in the sampling measure before injection.
  *
  * @param totalSites - Total number of grid sites
  * @param gridSize - Per-dimension grid sizes
@@ -472,6 +460,10 @@ export function computeFullCollapse(
   assertFiniteVector('computeFullCollapse: center', center, latticeDim)
   const sigma2 = resolveCollapseSigmaSquared('computeFullCollapse', sigma)
   const metricAxisWeights = metricAxisWeightsAt(center, latticeDim, options)
+
+  if (options?.metric?.kind === 'torus') {
+    compactDims = gridSize.map((_, d) => d < 3 || compactDims?.[d] === true)
+  }
 
   if (isAnimationWasmReady() && !metricAxisWeights) {
     const wasmCompact = new Uint8Array(compactDims ? latticeDim : 0)
@@ -520,7 +512,7 @@ export function computeFullCollapse(
  *   psi_post(x) = psi(x) * exp(-(x_d - x_meas)^2 / (2 * sigma^2))
  *
  * This preserves the conditional wavefunction in unmeasured dimensions.
- * The result is unnormalized; the TDSE renormalization pass handles normalization.
+ * The caller normalizes the result in the sampling measure before injection.
  *
  * @param psiRe - Current real parts of the wavefunction
  * @param psiIm - Current imaginary parts of the wavefunction
@@ -558,6 +550,8 @@ export function computePartialCollapse(
     return [new Float32Array(psiRe), new Float32Array(psiIm)]
   }
 
+  if (options?.metric?.kind === 'torus' && axis < 3) axisCompact = true
+
   if (isAnimationWasmReady() && !curvedMetric) {
     const wasmResult = computePartialCollapseWasm(
       psiRe,
@@ -594,9 +588,10 @@ export function computePartialCollapse(
     sqrtDet: 1,
   }
 
+  const stride = axisStride(gridSize, axis, latticeDim)
   for (let i = 0; i < totalSites; i++) {
     assertFiniteAmplitude('computePartialCollapse', psiRe[i]!, psiIm[i]!, i)
-    const axisCoord = extractAxisCoord(i, gridSize, axis, latticeDim)
+    const axisCoord = Math.floor(i / stride) % axisSize
     let g = envelope?.[axisCoord]
     if (g === undefined) {
       linearIndexToPosition(i, gridSize, spacing, latticeDim, positionScratch)
@@ -640,9 +635,11 @@ export function extractAxisCoord(
   axis: number,
   latticeDim: number
 ): number {
-  let remaining = linearIndex
-  for (let d = latticeDim - 1; d > axis; d--) {
-    remaining = Math.floor(remaining / gridSize[d]!)
-  }
-  return remaining % gridSize[axis]!
+  return Math.floor(linearIndex / axisStride(gridSize, axis, latticeDim)) % gridSize[axis]!
+}
+
+function axisStride(gridSize: number[], axis: number, latticeDim: number): number {
+  let stride = 1
+  for (let d = axis + 1; d < latticeDim; d++) stride *= gridSize[d]!
+  return stride
 }

@@ -166,12 +166,12 @@ All tests that currently use `waitForDiagnostics` after a parameter change shoul
 
 After implementing:
 ```bash
-npx playwright test scripts/playwright/open-quantum-physics.spec.ts scripts/playwright/roadmap-features.spec.ts scripts/playwright/physics-density-oracle.spec.ts scripts/playwright/physics-numerical-validation.spec.ts --workers=1
+pnpm exec playwright test scripts/playwright/open-quantum-physics.spec.ts scripts/playwright/roadmap-features.spec.ts scripts/playwright/physics-density-oracle.spec.ts scripts/playwright/physics-numerical-validation.spec.ts --workers=1
 ```
 
 Then full suite:
 ```bash
-npx playwright test
+pnpm exec playwright test
 ```
 
 Target: 0 failures (previously 25, currently ~11 with test-side patches).

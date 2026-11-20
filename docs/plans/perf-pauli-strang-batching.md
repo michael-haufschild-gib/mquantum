@@ -104,7 +104,7 @@ Template: the `DiracComputePass` changes from 2026-04-17 — see git log around 
 
 ### Part 3 — Verification
 
-- `npx vitest run` — existing 7630 tests must still pass. Pauli unit tests live in `src/tests/rendering/passes/` if any; check.
+- `pnpm exec vitest run` — existing 7630 tests must still pass. Pauli unit tests live in `src/tests/rendering/passes/` if any; check.
 - Run the new `pauli-batch-ab.spec.ts` (5 samples per arm, interleaved). Expect schroedinger Δ-median between −8 % and −15 % at 4+ steps/frame, on par with Dirac zitterbewegung.
 - Eyeball check: load the app, select Pauli mode, verify rendering looks unchanged. Bind-group misalignment in Part 1 can produce visually correct output that drifts over time — run the simulation for ~30 s and check for norm divergence via the perf monitor diagnostics.
 

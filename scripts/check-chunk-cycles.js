@@ -1,64 +1,39 @@
 #!/usr/bin/env node
-/**
- * Chunk dependency health check.
- *
- * Runs `vite build` and fails on:
- * 1. Circular chunk dependencies (cause TDZ ReferenceErrors in production)
- * 2. Name collisions between manual and auto-generated chunks
- *
- * Usage: node scripts/check-chunk-cycles.js
- */
+/** Build with Vite and check the emitted static import graph before writing it. */
+import { build } from 'vite'
 
-import { spawnSync } from 'node:child_process'
+await build({
+  plugins: [
+    {
+      name: 'check-chunk-cycles',
+      generateBundle(_, bundle) {
+        const checked = new Set()
+        const visiting = new Set()
+        const names = new Set()
 
-const CIRCULAR_RE = /Circular chunk:/gi
-const COLLISION_RE = /name collision/gi
+        function visit(file) {
+          const chunk = bundle[file]
+          if (chunk?.type !== 'chunk' || checked.has(file)) return
+          if (visiting.has(file)) {
+            const path = Array.from(visiting)
+            throw new Error(
+              'Circular chunk: ' + [...path.slice(path.indexOf(file)), file].join(' -> ')
+            )
+          }
 
-const result = spawnSync('pnpm', ['exec', 'vite', 'build'], {
-  cwd: import.meta.dirname + '/..',
-  encoding: 'utf-8',
-  maxBuffer: 20 * 1024 * 1024,
-  timeout: 120_000,
+          visiting.add(file)
+          for (const dependency of chunk.imports) visit(dependency)
+          visiting.delete(file)
+          checked.add(file)
+        }
+
+        for (const chunk of Object.values(bundle)) {
+          if (chunk.type !== 'chunk') continue
+          if (names.has(chunk.name)) throw new Error('Chunk name collision: ' + chunk.name)
+          names.add(chunk.name)
+          visit(chunk.fileName)
+        }
+      },
+    },
+  ],
 })
-
-const output = `${result.stdout || ''}\n${result.stderr || ''}`
-
-if (result.error) {
-  console.error('vite build failed:\n', output)
-  console.error(result.error.message)
-  process.exit(1)
-}
-
-if (result.status !== 0) {
-  console.error('vite build failed:\n', output)
-  process.exit(result.status ?? 1)
-}
-
-const combined = output
-const circularMatches = combined.match(CIRCULAR_RE) || []
-const collisionMatches = combined.match(COLLISION_RE) || []
-const problems = []
-
-if (circularMatches.length > 0) {
-  const lines = combined.split('\n').filter((l) => /Circular chunk:/i.test(l))
-  problems.push(...lines.map((l) => l.trim()))
-}
-
-if (collisionMatches.length > 0) {
-  const lines = combined.split('\n').filter((l) => /name collision/i.test(l))
-  problems.push(...lines.map((l) => l.trim()))
-}
-
-if (problems.length > 0) {
-  console.error('\nChunk dependency violations:\n')
-  for (const p of problems) {
-    console.error(`  ${p}`)
-  }
-  console.error(
-    '\nCircular chunks cause ReferenceError in production builds.',
-    '\nFix: adjust manualChunks in vite.config.ts to break the cycle.\n'
-  )
-  process.exit(1)
-} else {
-  console.log('Chunk dependencies OK — no circular deps or name collisions.')
-}

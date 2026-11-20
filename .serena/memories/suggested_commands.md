@@ -65,4 +65,4 @@ pnpm run wasm:build
 - **Tests in `src/tests/`**, Playwright specs in `scripts/playwright/`
 - **Screenshots go in `screenshots/`**, never project root
 - **No WebGL/GLSL** - all rendering is WebGPU/WGSL only
-- **Package manager is pnpm** (>= 10). Never run `npm`/`npx`.
+- **Package manager is pnpm** (>= 12). Never run `npm`/`npx`.

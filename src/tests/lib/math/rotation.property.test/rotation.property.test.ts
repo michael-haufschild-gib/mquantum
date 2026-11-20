@@ -4,9 +4,6 @@
  * Uses fast-check to verify SO(n) group invariants hold across arbitrary
  * dimensions, plane indices, and angles — catching the numerical boundary
  * cases that fixed-example tests miss.
- *
- * Note: This project uses a fast trig approximation (~1.2% max error),
- * so tolerances are looser than exact-trig would allow.
  */
 
 import fc from 'fast-check'
@@ -23,8 +20,7 @@ import {
 } from '@/lib/math'
 import { arbVector } from '@/tests/lib/math/arbitraries'
 
-// Fast trig compounds errors; 0.15 tolerance per element
-const FAST_TRIG_TOL = 0.15
+const FLOAT32_TOL = 1e-6
 
 // ---------------------------------------------------------------------------
 // Arbitraries
@@ -76,7 +72,7 @@ describe('rotation matrix SO(n) — properties', () => {
     fc.assert(
       fc.property(arbRotation, ({ dim, i, j, angle }) => {
         const R = createRotationMatrix(dim, i, j, angle)
-        expect(orthoError(R, dim)).toBeLessThan(FAST_TRIG_TOL)
+        expect(orthoError(R, dim)).toBeLessThan(FLOAT32_TOL)
       }),
       { numRuns: 200 }
     )
@@ -97,7 +93,7 @@ describe('rotation matrix SO(n) — properties', () => {
     fc.assert(
       fc.property(arbSmallRotation, ({ dim, i, j, angle }) => {
         const R = createRotationMatrix(dim, i, j, angle)
-        expect(Math.abs(determinant(R) - 1)).toBeLessThan(FAST_TRIG_TOL)
+        expect(Math.abs(determinant(R) - 1)).toBeLessThan(FLOAT32_TOL)
       }),
       { numRuns: 100 }
     )
@@ -115,7 +111,7 @@ describe('rotation matrix SO(n) — properties', () => {
         if (origMag < 1e-8) return // skip near-zero
         const rotMag = magnitude(rv)
         const relError = Math.abs(rotMag - origMag) / origMag
-        expect(relError).toBeLessThan(FAST_TRIG_TOL)
+        expect(relError).toBeLessThan(FLOAT32_TOL)
       }),
       { numRuns: 200 }
     )
@@ -128,7 +124,7 @@ describe('rotation matrix SO(n) — properties', () => {
         const Rinv = createRotationMatrix(dim, i, j, -angle)
         const RT = transposeMatrix(R)
         for (let k = 0; k < dim * dim; k++) {
-          expect(Rinv[k]).toBeCloseTo(RT[k]!, 0)
+          expect(Rinv[k]).toBeCloseTo(RT[k]!, 6)
         }
       }),
       { numRuns: 200 }
@@ -143,7 +139,7 @@ describe('rotation matrix SO(n) — properties', () => {
         const product = multiplyMatrices(R, Rinv)
         const I = createIdentityMatrix(dim)
         for (let k = 0; k < dim * dim; k++) {
-          expect(Math.abs(product[k]! - I[k]!)).toBeLessThan(FAST_TRIG_TOL)
+          expect(Math.abs(product[k]! - I[k]!)).toBeLessThan(FLOAT32_TOL)
         }
       }),
       { numRuns: 200 }
@@ -208,7 +204,7 @@ describe('rotation composition — properties', () => {
         const lhs = multiplyMatrices(multiplyMatrices(R1, R2), R3)
         const rhs = multiplyMatrices(R1, multiplyMatrices(R2, R3))
         for (let k = 0; k < dim * dim; k++) {
-          expect(lhs[k]).toBeCloseTo(rhs[k]!, 0)
+          expect(lhs[k]).toBeCloseTo(rhs[k]!, 6)
         }
       }),
       { numRuns: 100 }
@@ -231,7 +227,7 @@ describe('rotation composition — properties', () => {
         const AB = multiplyMatrices(R1, R2)
         const BA = multiplyMatrices(R2, R1)
         for (let k = 0; k < dim * dim; k++) {
-          expect(AB[k]).toBeCloseTo(BA[k]!, 0)
+          expect(AB[k]).toBeCloseTo(BA[k]!, 6)
         }
       }),
       { numRuns: 100 }

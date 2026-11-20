@@ -378,7 +378,9 @@ const StoreEigenstateButton: React.FC = React.memo(() => {
               data-testid="level-spacing-stats"
             >
               <div>
-                β={levelSpacing.brodyBeta.toFixed(2)} ({levelSpacing.classification})
+                {levelSpacing.classification === 'undetermined'
+                  ? 'Insufficient level-spacing data'
+                  : `β=${levelSpacing.brodyBeta.toFixed(2)} (${levelSpacing.classification} fit)`}
               </div>
               <div>⟨s⟩={levelSpacing.meanSpacing.toFixed(3)}</div>
             </div>

@@ -63,6 +63,17 @@ describe('jacobiEigenvalues — happy path', () => {
     expect(eig.length).toBe(0)
   })
 
+  it('resolves small spectra and recognizes convergence on the last allowed sweep', () => {
+    const scale = 1e-310
+    const { values, vectors } = jacobiEigendecompose(new Float64Array([0, scale, scale, 0]), 2, 1)
+    expect(values[0]! / scale).toBeCloseTo(1, 12)
+    expect(values[1]! / scale).toBeCloseTo(-1, 12)
+    expect(Math.abs(vectors[0]!)).toBeCloseTo(Math.SQRT1_2, 12)
+    expect(jacobiEigenvalues(new Float64Array([2, 0, 0, 1]), 2, 0)).toEqual(
+      new Float64Array([2, 1])
+    )
+  })
+
   it('does not overflow while symmetrizing large finite asymmetric entries', () => {
     const A = new Float64Array([0, Number.MAX_VALUE, Number.MAX_VALUE / 2, 0])
     const eig = jacobiEigenvalues(A, 2)

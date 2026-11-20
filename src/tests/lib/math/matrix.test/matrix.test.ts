@@ -207,6 +207,16 @@ describe('Matrix Operations', () => {
       ])
     })
 
+    it('handles shifted overlapping input and output views', () => {
+      const data = new Float32Array([1, 2, 3, 4, 0])
+      const input = data.subarray(0, 4)
+      const out = data.subarray(1)
+      const identity = createIdentityMatrix(2)
+      expect(() => multiplyMatrices(input, identity, out)).toThrow(/alias/)
+      multiplyMatricesInto(out, input, identity)
+      expect(Array.from(out)).toEqual([1, 2, 3, 4])
+    })
+
     it('handles aliasing when out === a (first operand)', () => {
       const A = mat([
         [1, 2],
@@ -391,8 +401,13 @@ describe('Matrix Operations', () => {
       expect(Math.abs(determinant(M))).toBeLessThan(EPSILON)
     })
 
-    it('rejects dimensions that would make recursive determinant explode', () => {
-      expect(() => determinant(createIdentityMatrix(9))).toThrow('recursive limit')
+    it('handles pivot swaps and high-dimensional anisotropic scales', () => {
+      const a = createIdentityMatrix(22)
+      for (let i = 0; i < 22; i++) a[i * 22 + i] = 2 ** (i < 11 ? 100 : -100)
+      a[1] = a[0]!
+      a[22] = a[23]!
+      a[0] = a[23] = 0
+      expect(determinant(a)).toBe(-1)
     })
   })
 
@@ -419,6 +434,11 @@ describe('Matrix Operations', () => {
         [3, 5],
       ])
       expect(matricesEqual(A, B)).toBe(false)
+    })
+
+    it('rejects NaN entries and accepts exact equality at zero tolerance', () => {
+      expect(matricesEqual(mat([[NaN]]), mat([[1]]))).toBe(false)
+      expect(matricesEqual(mat([[1]]), mat([[1]]), 0)).toBe(true)
     })
 
     it('handles floating point comparison with epsilon', () => {

@@ -12,11 +12,8 @@
  * bound). Werner state at visibility v reaches |S| up to 2√2 · v, which
  * is below 2 (no violation possible) for v ≤ 1/√2.
  *
- * Confidence interval: each E_ij is a sample mean of ±1-valued outcomes,
- * so its variance bound is (1 − E_ij²)/n_ij. S is a linear combination of
- * four sample means, with all coefficients ±1, so the variance bound is
- * Σ_ij (1 − E_ij²)/n_ij. The default CI half-width uses z = 1.96 for a
- * 95 % two-sided confidence band.
+ * Confidence limits combine per-setting Wilson score intervals for independent
+ * binomial counts using variance recovery (Zou, Huang & Zhang, 2009).
  *
  * @module lib/physics/bell/chsh
  */
@@ -64,6 +61,30 @@ export interface ConfidenceInterval {
   hi: number
   /** Half-width (hi − lo) / 2. */
   halfWidth: number
+}
+
+/** Estimate S and its Wilson–MOVER interval from bins in (ab, ab′, a′b, a′b′) order. */
+export function estimateChsh(
+  bins: readonly [BinStats, BinStats, BinStats, BinStats],
+  z = Z_95
+): { S: number; sCI: ConfidenceInterval } {
+  let S = 0
+  let lowerSq = 0
+  let upperSq = 0
+  for (const [i, { count, mean }] of bins.entries()) {
+    if (count === 0) return { S: NaN, sCI: { lo: NaN, hi: NaN, halfWidth: NaN } }
+    const signedMean = i === 1 ? -mean : mean
+    S += signedMean
+    // Wilson limits on a ±1 mean, obtained by mapping p to 2p − 1.
+    const q = (z * z) / count
+    const center = signedMean / (1 + q)
+    const radius = Math.sqrt(q * (1 - signedMean * signedMean + q)) / (1 + q)
+    lowerSq += (signedMean - center + radius) ** 2
+    upperSq += (center + radius - signedMean) ** 2
+  }
+  const lo = Math.max(-4, S - Math.sqrt(lowerSq))
+  const hi = Math.min(4, S + Math.sqrt(upperSq))
+  return { S, sCI: { lo, hi, halfWidth: (hi - lo) / 2 } }
 }
 
 /**
@@ -161,30 +182,10 @@ export class ChshAccumulator {
     return c.E_ab.mean - c.E_abp.mean + c.E_apb.mean + c.E_apbp.mean
   }
 
-  /**
-   * Two-sided confidence interval on S using the conservative Wald
-   * approximation under the bound Var(E_ij) ≤ (1 − E_ij²)/n_ij. Treats S
-   * as a sum of four uncorrelated bin means with unit coefficients
-   * (valid because each trial only contributes to one bin).
-   *
-   * @param z - z-score of the desired confidence level. Defaults to 1.96
-   *   (95 %). Other useful values: Z_99 = 2.5758 (99 %).
-   * @returns Confidence interval on S, or NaN-valued interval if any bin
-   *   is empty.
-   */
+  /** Two-sided approximate score interval, undefined until all four settings have data. */
   getSConfidenceInterval(z: number = Z_95): ConfidenceInterval {
     const c = this.getCorrelations()
-    if (c.E_ab.count === 0 || c.E_abp.count === 0 || c.E_apb.count === 0 || c.E_apbp.count === 0) {
-      return { lo: Number.NaN, hi: Number.NaN, halfWidth: Number.NaN }
-    }
-    const s = c.E_ab.mean - c.E_abp.mean + c.E_apb.mean + c.E_apbp.mean
-    const varSum =
-      (1 - c.E_ab.mean ** 2) / c.E_ab.count +
-      (1 - c.E_abp.mean ** 2) / c.E_abp.count +
-      (1 - c.E_apb.mean ** 2) / c.E_apb.count +
-      (1 - c.E_apbp.mean ** 2) / c.E_apbp.count
-    const halfWidth = z * Math.sqrt(Math.max(varSum, 0))
-    return { lo: s - halfWidth, hi: s + halfWidth, halfWidth }
+    return estimateChsh([c.E_ab, c.E_abp, c.E_apb, c.E_apbp], z).sCI
   }
 
   /** Reset all accumulators to zero. */

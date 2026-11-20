@@ -35,7 +35,7 @@ function samplingNorm(re: Float32Array, im: Float32Array, config: MeasurementGri
         : 1
     total += (re[idx]! * re[idx]! + im[idx]! * im[idx]!) * volumeWeight
   }
-  return total
+  return total * config.spacing.slice(0, latticeDim).reduce((v, dx) => v * dx, 1)
 }
 
 afterEach(() => {
@@ -171,7 +171,7 @@ describe('executeFullMeasurement', () => {
     const config = {
       latticeDim: 1,
       gridSize: [3],
-      spacing: [1],
+      spacing: [0.25],
       metric: { kind: 'deSitter' as const, hubbleRate: 0.5 },
       time: 2,
     }
@@ -299,7 +299,7 @@ describe('executePartialMeasurement', () => {
     const config = {
       latticeDim: 1,
       gridSize: [3],
-      spacing: [1],
+      spacing: [0.25],
       metric: { kind: 'deSitter' as const, hubbleRate: 0.5 },
       time: 2,
     }

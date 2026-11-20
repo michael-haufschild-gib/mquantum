@@ -2,7 +2,7 @@
 
 **Purpose**: File placement, naming conventions, and code templates for this codebase.
 **Read This When**: Creating new files, adding features, or understanding project structure.
-**Stack**: React 19 + TypeScript 5 + Vite 7 + Zustand 5 + Custom WebGPU Renderer + WGSL Shaders + Rust/WASM
+**Stack**: React 19 + TypeScript 7 + Vite 8 + Zustand 5 + Custom WebGPU Renderer + WGSL Shaders + Rust/WASM
 
 ## Directory Map
 

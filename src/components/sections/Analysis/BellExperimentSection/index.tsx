@@ -135,9 +135,11 @@ export const BellExperimentContent: React.FC = React.memo(() => {
   const qmS = Number.isFinite(qm.S) ? Math.abs(qm.S) : Number.NaN
   const lhvS = Number.isFinite(lhv.S) ? Math.abs(lhv.S) : Number.NaN
   const ci = qm.sCI
+  const absCiLow = Math.max(0, ci.lo, -ci.hi)
+  const absCiHigh = Math.max(Math.abs(ci.lo), Math.abs(ci.hi))
   const qmCiText =
     Number.isFinite(qmS) && Number.isFinite(ci.halfWidth)
-      ? `${qmS.toFixed(3)} ± ${ci.halfWidth.toFixed(3)}`
+      ? `${qmS.toFixed(3)} [${absCiLow.toFixed(3)}, ${absCiHigh.toFixed(3)}]`
       : '—'
 
   // Loophole budget: closed-form joint max |S| under the current (v, η).

@@ -76,13 +76,11 @@ fn ks_statistic(sorted_spacings: &[f64], beta: f64) -> f64 {
     let b = gamma_fn((beta + 2.0) / bp1).powf(bp1);
 
     let mut max_d: f64 = 0.0;
-    for i in 0..n {
-        let empirical = (i + 1) as f64 / n as f64;
-        let theoretical = 1.0 - (-b * sorted_spacings[i].powf(bp1)).exp();
-        let d = (empirical - theoretical).abs();
-        if d > max_d {
-            max_d = d;
-        }
+    for (i, spacing) in sorted_spacings.iter().enumerate() {
+        let theoretical = -(-b * spacing.powf(bp1)).exp_m1();
+        max_d = max_d
+            .max(theoretical - i as f64 / n as f64)
+            .max((i + 1) as f64 / n as f64 - theoretical);
     }
     max_d
 }
@@ -91,7 +89,7 @@ fn ks_statistic(sorted_spacings: &[f64], beta: f64) -> f64 {
 /// section search minimizing the KS statistic.
 fn fit_brody_parameter(spacings: &mut [f64]) -> f64 {
     if spacings.len() < 2 {
-        return 0.0;
+        return f64::NAN;
     }
 
     // Sort spacings for CDF comparison
@@ -132,7 +130,7 @@ fn fit_brody_parameter(spacings: &mut [f64]) -> f64 {
 /// Returns a packed `Vec<f64>`:
 ///   `[spacings...(N-1 values), brody_beta, mean_spacing, classification_code]`
 ///
-/// Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
+/// Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson, 3 = undetermined
 ///
 /// # Arguments
 /// * `energies` - Eigenvalue array (at least 3 elements for meaningful results)
@@ -144,8 +142,7 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
         .collect::<Vec<f64>>();
     let n = sorted.len();
     if n < 2 {
-        // Return empty spacings + beta=0, mean=0, classification=0 (poisson)
-        return vec![0.0, 0.0, 0.0];
+        return vec![f64::NAN, 0.0, 3.0];
     }
 
     // Sort energies ascending
@@ -153,59 +150,39 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
 
     // Nearest-neighbor spacings
     let num_spacings = n - 1;
-    let mut raw_spacings = Vec::with_capacity(num_spacings);
-    let mut has_invalid_spacing = false;
-    for i in 1..n {
-        let spacing = sorted[i] - sorted[i - 1];
-        if spacing.is_finite() && spacing >= 0.0 {
-            raw_spacings.push(spacing);
-        } else {
-            raw_spacings.push(0.0);
-            has_invalid_spacing = true;
-        }
-    }
-
-    // Unfolding: normalize by mean spacing
-    let mean_spacing: f64 = raw_spacings.iter().sum::<f64>() / num_spacings as f64;
-    if has_invalid_spacing || !mean_spacing.is_finite() || mean_spacing <= 0.0 {
-        let mut result = Vec::with_capacity(num_spacings + 3);
-        result.extend_from_slice(&raw_spacings);
-        result.push(0.0); // brody_beta
-        result.push(if mean_spacing.is_finite() {
-            mean_spacing
-        } else {
-            0.0
-        });
-        result.push(0.0); // poisson
-        return result;
-    }
-    let mut spacings = raw_spacings
-        .iter()
-        .map(|&s| s / mean_spacing)
-        .collect::<Vec<f64>>();
-
-    // Brody parameter fit (modifies spacings in-place via sort)
-    let brody_beta = fit_brody_parameter(&mut spacings);
+    let scale = if (sorted[n - 1] - sorted[0]).is_finite() {
+        1.0
+    } else {
+        0.5
+    };
+    let width = sorted[n - 1] * scale - sorted[0] * scale;
+    let mean_spacing = width / num_spacings as f64 / scale;
+    let mut result: Vec<f64> = sorted
+        .windows(2)
+        .map(|w| {
+            if width == 0.0 {
+                0.0
+            } else {
+                (w[1] * scale - w[0] * scale) / width * num_spacings as f64
+            }
+        })
+        .collect();
+    let brody_beta = if width > 0.0 {
+        fit_brody_parameter(&mut result.clone())
+    } else {
+        f64::NAN
+    };
 
     // Classification thresholds (match TS exactly)
-    let classification_code: f64 = if brody_beta < 0.3 {
+    let classification_code: f64 = if !brody_beta.is_finite() {
+        3.0 // undetermined
+    } else if brody_beta < 0.3 {
         0.0 // poisson
     } else if brody_beta > 0.7 {
         2.0 // wigner-dyson
     } else {
         1.0 // intermediate
     };
-
-    // Pack result: [spacings (unfolded, sorted by fit_brody), brody_beta, mean_spacing, classification]
-    // Note: spacings are returned sorted (as the TS version does in its return value — the
-    // unfolded spacings are the same values regardless of sort order, and the consumer
-    // uses them for distribution analysis where order doesn't matter).
-    let mut result = Vec::with_capacity(num_spacings + 3);
-
-    // Return unfolded spacings (re-compute from raw to preserve original order)
-    for s in &raw_spacings {
-        result.push(s / mean_spacing);
-    }
 
     result.push(brody_beta);
     result.push(mean_spacing);
@@ -603,6 +580,12 @@ mod tests {
     }
 
     #[test]
+    fn test_ks_includes_left_limit_at_ties() {
+        // F(1) = 1 − exp(−1) just before the empirical CDF jumps from 0 to 1.
+        assert!((ks_statistic(&[1.0, 1.0], 0.0) - (1.0 - (-1.0_f64).exp())).abs() < 1e-12);
+    }
+
+    #[test]
     fn test_ks_mismatch() {
         // Uniform spacings [0.5, 1.0, 1.5, 2.0] tested against β=1 should give non-trivial KS
         let spacings = vec![0.5, 1.0, 1.5, 2.0];
@@ -688,7 +671,7 @@ mod tests {
     }
 
     #[test]
-    fn test_level_spacing_degenerate_spectrum_is_poisson() {
+    fn test_level_spacing_degenerate_spectrum_has_no_fit() {
         let energies = vec![1.5; 20];
         let result = compute_level_spacing(&energies);
         let num_spacings = energies.len() - 1;
@@ -697,9 +680,9 @@ mod tests {
         for spacing in &result[..num_spacings] {
             assert_eq!(*spacing, 0.0);
         }
-        assert_eq!(result[num_spacings], 0.0);
+        assert!(result[num_spacings].is_nan());
         assert_eq!(result[num_spacings + 1], 0.0);
-        assert_eq!(result[num_spacings + 2], 0.0);
+        assert_eq!(result[num_spacings + 2], 3.0);
     }
 
     #[test]
@@ -712,19 +695,19 @@ mod tests {
     }
 
     #[test]
-    fn test_level_spacing_non_finite_only_returns_finite_empty_metadata() {
+    fn test_level_spacing_non_finite_only_has_no_fit() {
         let result = compute_level_spacing(&[f64::NAN, f64::INFINITY]);
-        assert_eq!(result, vec![0.0, 0.0, 0.0]);
+        assert!(result[0].is_nan());
+        assert_eq!(&result[1..], &[0.0, 3.0]);
     }
 
     #[test]
-    fn test_level_spacing_overflowed_finite_spacings_return_finite_poisson_metadata() {
+    fn test_level_spacing_mean_of_large_finite_gaps() {
         let result = compute_level_spacing(&[-f64::MAX, 0.0, f64::MAX]);
         assert_eq!(result.len(), 5);
         assert!(result.iter().all(|v| v.is_finite()));
-        assert_eq!(result[2], 0.0); // brody_beta
-        assert_eq!(result[3], 0.0); // mean_spacing fallback after overflowed sum
-        assert_eq!(result[4], 0.0); // poisson
+        assert_eq!(&result[..2], &[1.0, 1.0]);
+        assert_eq!(result[3], f64::MAX);
     }
 
     // ── Scar correlation tests ──

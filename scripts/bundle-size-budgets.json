@@ -1,6 +1,6 @@
 {
   "_": "Per-chunk gzip-size budgets in bytes. Match key is the chunk file name minus its 8-char content hash and `.js` extension (e.g. `shaders-schroedinger-DZSrQAL0.js` → `shaders-schroedinger`). The check script `scripts/check-bundle-size.js` enforces actuals <= budget for every observed chunk; budgets with no observed chunk also fail (catches stale entries) and chunks with no budget also fail (catches accidental new chunks).",
-  "_lastMeasured": "2026-09-24",
+  "_lastMeasured": "2026-11-20",
   "_methodology": "Run `pnpm run build:web` then `pnpm run bundle:check`. Pre-commit runs this for bundle-impacting staged files so PR CI does not spend time failing late on bundle budgets. Headroom rule: large chunks (>10 kB) get ~10 % above the current actual; small chunks (1–10 kB) get ~15 % or +600 bytes (whichever is larger); tiny chunks (<1 kB) get an absolute 800-byte floor. The asymmetric rule prevents tiny chunks from ratcheting to 5×–10× their actual byte count just because absolute headroom needs a sane minimum.",
   "_ratchet": "Raise a budget only when the chunk grows for an intentional reason and you can name it in the PR description. Do not raise budgets to silence the alarm. Lower budgets opportunistically when chunks shrink so the headroom does not bloat over time.",
   "chunks": {
@@ -19,13 +19,13 @@
     "rendering-ads": { "gzip": 11100 },
     "physics": { "gzip": 124000 },
     "react-vendor": { "gzip": 75600 },
-    "motion": { "gzip": 46700 },
+    "motion": { "gzip": 54100 },
     "components": { "gzip": 45300 },
     "examples-scenes": { "gzip": 8050 },
     "examples-styles": { "gzip": 2530 },
     "stores": { "gzip": 66642 },
-    "components-analysis-deferred": { "gzip": 63000 },
-    "mediabunny": { "gzip": 56200 },
+    "components-analysis-deferred": { "gzip": 70600 },
+    "mediabunny": { "gzip": 69500 },
     "components-geometry-deferred": { "gzip": 53500 },
     "shaders": { "gzip": 14400 },
     "components-deferred": { "gzip": 34000 },
@@ -38,7 +38,7 @@
     "kSpaceWorker": { "gzip": 6507 },
     "coordinateEntanglement.worker": { "gzip": 4750 },
     "detect-gpu": { "gzip": 3700 },
-    "mdimension_core": { "gzip": 3600 },
+    "mdimension_core": { "gzip": 8200 },
     "incompressibleSpectrum.worker": { "gzip": 3300 },
     "video": { "gzip": 3100 },
     "zustand": { "gzip": 2400 },
@@ -48,6 +48,7 @@
     "volume.worker": { "gzip": 2000 },
     "rendering-skybox-codec": { "gzip": 4500 },
     "image": { "gzip": 800 },
+    "rolldown-runtime": { "gzip": 800 },
     "core-utils": { "gzip": 800 }
   }
 }
