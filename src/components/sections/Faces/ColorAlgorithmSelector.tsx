@@ -13,7 +13,10 @@ import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import { freeScalarVacuumCanEvolveKSpaceOccupation } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
-import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import {
+  getQuantumTypeDefaultColorAlgorithm,
+  supportsSchroedingerSurfaceMode,
+} from '@/lib/geometry/registry'
 import { pauliFieldViewForColorAlgorithm } from '@/rendering/webgpu/scenePassConfig'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
@@ -157,12 +160,13 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         } else if (
           quantumMode === 'coherenceHorizon' ||
           quantumMode === 'riemannZeta' ||
-          quantumMode === 'hilbertPolya'
+          quantumMode === 'hilbertPolya' ||
+          quantumMode === 'modularHorizon'
         ) {
           // CH / Arithmetic Horizon / Hilbert–Pólya allowlists exclude both
           // compute and analytic defaults; pin to the registry default so the
           // fallback cannot loop.
-          setColorAlgorithm('mixed')
+          setColorAlgorithm(getQuantumTypeDefaultColorAlgorithm(quantumMode) as ColorAlgorithm)
         } else {
           setColorAlgorithm(isComputeMode ? 'blackbody' : 'radialDistance')
         }

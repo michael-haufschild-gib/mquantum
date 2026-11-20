@@ -30,6 +30,7 @@ import {
   buildPipelineOutputs,
   buildShaderConfig,
   isComputeQuantumMode,
+  isPipeline2D,
 } from '../rendererConfigUtils'
 import {
   computeBasisUpdate,
@@ -231,6 +232,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       device: null as unknown as GPUDevice,
       rendererConfig: this.rendererConfig,
       schroedingerUniformData: this.schroedingerUniformData,
+      cameraUniformData: this.cameraUniformData,
       basisUniformData: this.basisUniformData,
       schroedingerFloatView: this.schroedingerFloatView,
       schroedingerIntView: this.schroedingerIntView,
@@ -430,8 +432,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private executeNullGuardWarned = false
 
   execute(ctx: WebGPURenderContext): void {
-    const is2D =
-      (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
+    const is2D = isPipeline2D(this.rendererConfig)
 
     if (
       !this.device ||

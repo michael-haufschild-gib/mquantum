@@ -147,6 +147,16 @@ export function isRaymarchingType(type: ObjectType): boolean {
   return false
 }
 
+/** Whether the active renderer implements the shared volume effects. */
+export function supportsSharedVolumeEffects(
+  type: ObjectType,
+  mode: SchroedingerQuantumMode
+): boolean {
+  const key = resolveQuantumTypeKey(type, mode)
+  const entry = key && QUANTUM_TYPE_REGISTRY.get(key)
+  return !!entry && entry.rendering.supportsSharedVolumeEffects !== false
+}
+
 // ============================================================================
 // Dimension Constraint Helpers
 // ============================================================================
@@ -504,6 +514,8 @@ export function supportsSchroedingerSurfaceMode(
   // Modular Knot likewise owns a dedicated 3D-texture volumetric main block —
   // no isosurface pipeline composes for it, so the surface toggle is meaningless.
   if (options.quantumMode === 'modularKnot') return false
+  if (options.quantumMode && !supportsSharedVolumeEffects(options.objectType, options.quantumMode))
+    return false
   // The WDW ⊗ ζ suite renders through its shared 3D-texture volumetric main
   // block (which already presents each mode as a glowing surface/relief); the
   // shared density-grid isosurface pipeline never composes for it, so the

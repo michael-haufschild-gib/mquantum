@@ -215,6 +215,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
         'hilbertPolya',
         'hydrogenND',
         'hydrogenNDCoupled',
+        'modularHorizon',
         'modularKnot',
         'moebiusNoBoundary',
         'pauliSpinor',

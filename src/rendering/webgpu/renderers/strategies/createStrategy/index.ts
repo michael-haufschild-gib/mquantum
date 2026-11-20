@@ -82,6 +82,10 @@ export async function createModeStrategy(
       const { BifurcationHorizonStrategy } = await import('../BifurcationHorizonStrategy')
       return new BifurcationHorizonStrategy()
     }
+    case 'modularHorizon': {
+      const { ModularHorizonStrategy } = await import('../ModularHorizonStrategy')
+      return new ModularHorizonStrategy()
+    }
     case 'modularKnot': {
       const { ModularKnotStrategy } = await import('../ModularKnotStrategy')
       return new ModularKnotStrategy()

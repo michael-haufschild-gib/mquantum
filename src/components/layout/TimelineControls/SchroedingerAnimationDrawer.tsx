@@ -21,7 +21,7 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
-import { isComputeQuantumType } from '@/lib/geometry/registry'
+import { isComputeQuantumType, supportsSharedVolumeEffects } from '@/lib/geometry/registry'
 import {
   type ExtendedObjectState,
   useExtendedObjectStore,
@@ -131,6 +131,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     const isPauliSpinor = objectType === 'pauliSpinor'
     const isHydrogenNDMode =
       config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
+    const sharedEffects = supportsSharedVolumeEffects(objectType, config.quantumMode)
     const isTdse = config.quantumMode === 'tdseDynamics'
     // Compute modes (FSF/TDSE/BEC/Dirac/QW/Pauli) use GPU density grids, not inline evalPsi().
     // Shader features that depend on inline wavefunction evaluation (interference,
@@ -153,7 +154,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
         )}
 
         {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
-        {!isComputeMode && (
+        {sharedEffects && !isComputeMode && (
           <ProbabilityCurrentPanel
             config={config}
             setProbabilityCurrentEnabled={setProbabilityCurrentEnabled}
@@ -202,7 +203,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
         )}
 
         {/* Interference Fringing — not applicable for compute modes (requires inline wavefunction) */}
-        {!isComputeMode && (
+        {sharedEffects && !isComputeMode && (
           <DrawerSection
             title="Interference Fringing"
             enabled={config.interferenceEnabled}
@@ -248,7 +249,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
         )}
 
         {/* Phase Shimmer — visual-only noise effect, not applicable for compute modes */}
-        {!isComputeMode && (
+        {sharedEffects && !isComputeMode && (
           <DrawerSection
             title="Phase Shimmer"
             enabled={config.phaseShimmerEnabled}
@@ -283,7 +284,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
         )}
 
         {/* Slice Animation - 4D+ only */}
-        {dimension >= 4 && (
+        {sharedEffects && dimension >= 4 && (
           <DimensionalSweepsSection
             enabled={config.sliceAnimationEnabled}
             amplitude={config.sliceAmplitude}

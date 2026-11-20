@@ -91,6 +91,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isHilbertPolya = sanitizeShaderBoolean(config.isHilbertPolya, false)
   const isBifurcationHorizon = sanitizeShaderBoolean(config.isBifurcationHorizon, false)
   const isModularKnot = sanitizeShaderBoolean(config.isModularKnot, false)
+  const isModularHorizon = config.isModularHorizon === true
   const isWdwZetaVolume = sanitizeShaderBoolean(config.isWdwZetaVolume, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
@@ -201,7 +202,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     useDensityGrid,
     useDensityMatrix,
     useWignerCache,
-    gridOnly
+    gridOnly,
+    isModularHorizon ? colorAlgorithm : undefined
   )
 
   // Build blocks array in dependency order
@@ -238,6 +240,7 @@ struct VertexOutput {
         isRiemannZeta,
         isHilbertPolya,
         isBifurcationHorizon,
+        isModularHorizon,
         isModularKnot,
         isWdwZetaVolume,
       }),
@@ -251,6 +254,7 @@ struct VertexOutput {
     isRiemannZeta ||
     isHilbertPolya ||
     isBifurcationHorizon ||
+    isModularHorizon ||
     isModularKnot ||
     isWdwZetaVolume
       ? []
@@ -285,6 +289,7 @@ struct VertexOutput {
     isRiemannZeta ||
     isHilbertPolya ||
     isBifurcationHorizon ||
+    isModularHorizon ||
     isModularKnot ||
     isWdwZetaVolume
       ? []

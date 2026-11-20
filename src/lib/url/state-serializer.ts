@@ -20,6 +20,7 @@
  */
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { type ModularHorizonConfig, validHorizon } from '@/lib/geometry/extended/modularHorizon'
 import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
 import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
@@ -109,6 +110,7 @@ export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'hilbertPolya',
   'bifurcationHorizon',
   'modularKnot',
+  'modularHorizon',
   'constraintSeam',
   'moebiusNoBoundary',
   'forcedCell',
@@ -153,6 +155,7 @@ export interface ShareableObjectState
     CosmologySerializableState {
   dimension: number
   objectType: ObjectType
+  modularHorizon?: ModularHorizonConfig
   quantumMode?: SchroedingerQuantumMode
 
   // ── Rendering ────────────────────────────────────────────────────────────
@@ -364,6 +367,7 @@ export function serializeState(state: ShareableState): string {
 
   // Modular Knot. Same dormant-field rule as the other horizon modes:
   // only emitted while the mode is active.
+  serializeHorizonConfig(params, state)
   if (state.quantumMode === 'modularKnot') {
     serializeModularKnot(params, state)
   }
@@ -460,6 +464,13 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   deserializeBifurcationHorizon(params, state)
 
   // Modular Knot.
+  if (state.quantumMode === 'modularHorizon' && params.has('mh')) {
+    try {
+      state.modularHorizon = validHorizon(JSON.parse(params.get('mh')!))
+    } catch {
+      /* An invalid optional config leaves the default preset active. */
+    }
+  }
   deserializeModularKnot(params, state)
 
   // WDW ⊗ ζ suite.
@@ -500,4 +511,9 @@ export function generateShareUrl(state: ShareableState): string {
 export function parseCurrentUrl(): ParsedShareableState {
   if (typeof window === 'undefined') return {}
   return deserializeState(window.location.search)
+}
+
+function serializeHorizonConfig(params: URLSearchParams, state: ShareableObjectState): void {
+  if (state.quantumMode === 'modularHorizon' && state.modularHorizon)
+    params.set('mh', JSON.stringify(validHorizon(state.modularHorizon)))
 }

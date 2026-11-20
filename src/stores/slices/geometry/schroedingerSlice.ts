@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand'
 
 import { sanitizeFreeScalarConfig } from '@/lib/geometry/extended/freeScalar'
+import { validHorizon } from '@/lib/geometry/extended/modularHorizon'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import {
   sanitizeSchroedingerBooleanScalars,
@@ -43,6 +44,7 @@ import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeS
 import { createBifurcationHorizonSetters } from './setters/horizonModes/bifurcationHorizonSetters'
 import { createCoherenceHorizonSetters } from './setters/horizonModes/coherenceHorizonSetters'
 import { createHilbertPolyaSetters } from './setters/horizonModes/hilbertPolyaSetters'
+import { createModularHorizonSetters } from './setters/horizonModes/modularHorizonSetters'
 import { createModularKnotSetters } from './setters/horizonModes/modularKnotSetters'
 import { createRiemannZetaSetters } from './setters/horizonModes/riemannZetaSetters'
 import { createWdwZetaSetters } from './setters/horizonModes/wdwZetaSetters'
@@ -388,6 +390,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createHilbertPolyaSetters(ctx),
     ...createBifurcationHorizonSetters(ctx),
     ...createModularKnotSetters(ctx),
+    ...createModularHorizonSetters(ctx),
     ...createWdwZetaSetters(ctx),
 
     // === Quantum Walk ===
@@ -435,6 +438,15 @@ export const createSchroedingerSlice: StateCreator<
           'hydrogenNDPreset'
         )
         const schroedinger = { ...state.schroedinger, ...sanitizedConfig }
+        if (sanitizedConfig.modularHorizon)
+          schroedinger.modularHorizon = validHorizon({
+            ...state.schroedinger.modularHorizon,
+            ...sanitizedConfig.modularHorizon,
+          })
+        if (schroedinger.quantumMode === 'modularHorizon') {
+          schroedinger.representation = 'position'
+          schroedinger.isoEnabled = false
+        }
         Object.assign(schroedinger, sanitizeHydrogenQuantumState(schroedinger, state.schroedinger))
         Object.assign(schroedinger, sanitizeHydrogenExtraDimState(schroedinger, state.schroedinger))
         if (hasHydrogenPreset) {

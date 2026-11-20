@@ -26,6 +26,7 @@ import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeSca
 import type { BifurcationHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/bifurcationHorizonSetters'
 import type { CoherenceHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/coherenceHorizonSetters'
 import type { HilbertPolyaSetters } from '@/stores/slices/geometry/setters/horizonModes/hilbertPolyaSetters'
+import type { ModularHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/modularHorizonSetters'
 import type { ModularKnotSetters } from '@/stores/slices/geometry/setters/horizonModes/modularKnotSetters'
 import type { RiemannZetaSetters } from '@/stores/slices/geometry/setters/horizonModes/riemannZetaSetters'
 import type { WdwZetaSetters } from '@/stores/slices/geometry/setters/horizonModes/wdwZetaSetters'
@@ -52,6 +53,7 @@ export interface SchroedingerSliceActions
     HilbertPolyaSetters,
     BifurcationHorizonSetters,
     ModularKnotSetters,
+    ModularHorizonSetters,
     WdwZetaSetters,
     BecSetters,
     DiracSetters,

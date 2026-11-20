@@ -92,6 +92,7 @@ import {
   volumeRaymarchBlock,
 } from './volume/integration.wgsl'
 import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
+import { horizonUniforms } from './volume/mainModularHorizon.wgsl'
 import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
 import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
 
@@ -139,6 +140,7 @@ export function buildBindGroupBlock(opts: {
    * distinct quantum mode, so the declarations never collide.
    */
   isModularKnot?: boolean
+  isModularHorizon?: boolean
   /**
    * WDW ⊗ ζ suite CPU-baked RGBA volume (binding 2) + linear sampler (binding 3)
    * at group 2 — the same 3D-texture layout as Modular Knot, shared by all ten
@@ -183,6 +185,13 @@ export function buildBindGroupBlock(opts: {
 // per cell, index (it*BH_NU + iu) (row-major in t, column u fastest), generated
 // on the CPU by BifurcationHorizonStrategy.
 @group(2) @binding(2) var<storage, read> bifurcationLut: array<vec4f>;`
+      : '') +
+    (opts.isModularHorizon
+      ? `
+@group(2) @binding(2) var horizonAtlas: texture_2d_array<f32>;
+@group(2) @binding(3) var horizonSampler: sampler;
+${horizonUniforms}
+`
       : '') +
     (opts.isModularKnot
       ? '\n' +

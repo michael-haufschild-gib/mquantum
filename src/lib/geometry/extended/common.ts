@@ -115,6 +115,7 @@ export type SchroedingerQuantumMode =
   | 'hilbertPolya'
   | 'bifurcationHorizon'
   | 'modularKnot'
+  | 'modularHorizon'
   // WDW ⊗ ζ suite (the eleven WDW_ZETA_MODES)
   | 'constraintSeam'
   | 'moebiusNoBoundary'

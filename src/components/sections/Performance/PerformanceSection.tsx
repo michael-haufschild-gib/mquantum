@@ -7,8 +7,12 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Slider } from '@/components/ui/Slider'
+import { supportsSharedVolumeEffects } from '@/lib/geometry/registry'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
@@ -39,6 +43,9 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
         }))
       )
 
+    const object = useGeometryStore((s) => s.objectType)
+    const mode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+    const volume = supportsSharedVolumeEffects(object, mode)
     return (
       <Section title="Performance" defaultOpen={defaultOpen}>
         {/* Frame Rate & Resolution */}
@@ -68,10 +75,24 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
         </div>
 
         {/* Temporal Reprojection */}
-        <TemporalReprojectionControls />
+        {volume ? (
+          <TemporalReprojectionControls />
+        ) : (
+          <UnavailableSection
+            title="Temporal reprojection"
+            reason="Requires the shared wavefunction renderer."
+          />
+        )}
 
         {/* Eigenfunction Cache */}
-        <EigenfunctionCacheControls />
+        {volume ? (
+          <EigenfunctionCacheControls />
+        ) : (
+          <UnavailableSection
+            title="Eigenfunction cache"
+            reason="Requires the shared wavefunction renderer."
+          />
+        )}
       </Section>
     )
   }

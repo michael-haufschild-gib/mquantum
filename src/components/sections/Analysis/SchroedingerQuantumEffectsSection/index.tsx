@@ -13,7 +13,7 @@ import type {
   SchroedingerNodalRenderMode,
 } from '@/lib/geometry/extended/types'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
-import { isComputeQuantumType } from '@/lib/geometry/registry'
+import { isComputeQuantumType, supportsSharedVolumeEffects } from '@/lib/geometry/registry'
 import {
   type ExtendedObjectState,
   useExtendedObjectStore,
@@ -160,6 +160,13 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
         />
       )
     }
+    if (!supportsSharedVolumeEffects(objectType, config.quantumMode))
+      return (
+        <UnavailableSection
+          title="Quantum Effects"
+          reason="Requires the shared wavefunction renderer."
+        />
+      )
     if (config.quantumMode === 'hilbertPolya') {
       // The dedicated volumetric main block composes none of these effects —
       // every toggle here would be a silent no-op for this mode.

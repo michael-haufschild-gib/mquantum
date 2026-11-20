@@ -52,7 +52,7 @@ export function isPipeline2D(config: SchrodingerRendererConfig): boolean {
   if (config.quantumMode === 'bifurcationHorizon') return false
   // Modular Knot likewise always renders through its dedicated 3D-texture
   // volumetric main block — never the 2D / Wigner pipeline.
-  if (config.quantumMode === 'modularKnot') return false
+  if (config.quantumMode === 'modularKnot' || config.quantumMode === 'modularHorizon') return false
   // The WDW ⊗ ζ suite always renders through its shared 3D-texture volumetric
   // main block — never the 2D / Wigner pipeline.
   if (isWdwZetaMode(config.quantumMode)) return false
@@ -149,7 +149,7 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
     result.fastEigenInterpolationEnabled = false
   }
 
-  if (result.quantumMode === 'modularKnot') {
+  if (result.quantumMode === 'modularKnot' || result.quantumMode === 'modularHorizon') {
     // The 3D-texture volumetric main block renders full-res single-output and
     // samples the baked RGBA volume inline — temporal MRT and the eigenfunction
     // cache never apply.
@@ -244,6 +244,7 @@ function buildDedicatedMainBlockConfig(
     | 'isHilbertPolya'
     | 'isBifurcationHorizon'
     | 'isModularKnot'
+    | 'isModularHorizon'
     | 'isWdwZetaVolume'
   >
 ): SchroedingerWGSLShaderConfig {
@@ -281,6 +282,7 @@ function buildDedicatedMainBlockConfig(
     isHilbertPolya: false,
     isBifurcationHorizon: false,
     isModularKnot: false,
+    isModularHorizon: false,
     isWdwZetaVolume: false,
     freeScalarAnalysis: false,
     useDensityMatrix: false,
@@ -411,6 +413,10 @@ export function buildShaderConfig(
     })
   }
 
+  if (strategyKind === 'modularHorizon')
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isModularHorizon: true,
+    })
   if (isModularKnot) {
     // Modular Knot: dedicated 3D-texture volumetric main block sampling the
     // group-2 baked RGBA volume (ModularKnotStrategy adds the binding-2 texture
@@ -524,6 +530,7 @@ export function buildPipelineOutputs(
     cfg.quantumMode !== 'hilbertPolya' &&
     cfg.quantumMode !== 'bifurcationHorizon' &&
     cfg.quantumMode !== 'modularKnot' &&
+    cfg.quantumMode !== 'modularHorizon' &&
     !isWdwZetaMode(cfg.quantumMode)
   const pipelineIs2D = isPipeline2D(cfg)
 
@@ -610,6 +617,7 @@ export function computePipelineCacheKey(
     config.isHilbertPolya ? 1 : 0,
     config.isBifurcationHorizon ? 1 : 0,
     config.isModularKnot ? 1 : 0,
+    config.isModularHorizon ? 1 : 0,
     config.isWdwZetaVolume ? 1 : 0,
   ].join(':')
 }

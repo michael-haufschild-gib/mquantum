@@ -54,6 +54,7 @@ const FIRST_PRESET_IDS = {
   hilbertPolya: 'criticalPlane',
   bifurcationHorizon: 'eternalThroat',
   modularKnot: 'rademacherTangle',
+  modularHorizon: 'silentReturn',
   constraintSeam: 'completedState',
   moebiusNoBoundary: 'modularMandala',
   forcedCell: 'berryKeating',
@@ -112,6 +113,7 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   bifurcationHorizon: (dimension) =>
     dimension >= 3 ? FIRST_PRESET_IDS.bifurcationHorizon : undefined,
   modularKnot: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.modularKnot : undefined),
+  modularHorizon: () => FIRST_PRESET_IDS.modularHorizon,
   constraintSeam: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.constraintSeam : undefined),
   moebiusNoBoundary: (d) => (d >= 3 ? FIRST_PRESET_IDS.moebiusNoBoundary : undefined),
   forcedCell: (d) => (d >= 3 ? FIRST_PRESET_IDS.forcedCell : undefined),

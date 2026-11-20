@@ -14,14 +14,7 @@ import { useEffect, useRef } from 'react'
 import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
-import {
-  applyBifurcationHorizonParams,
-  applyCoherenceHorizonParams,
-  applyHilbertPolyaParams,
-  applyModularKnotParams,
-  applyRiemannZetaParams,
-  applyWdwZetaParams,
-} from '@/lib/url/applyHorizonModeParams'
+import { applySpectralHorizonParams, applyWdwZetaParams } from '@/lib/url/applyHorizonModeParams'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
@@ -751,11 +744,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'diracEquation') applyDiracParams(urlState, ext)
     if (effectiveQuantumMode === 'wheelerDeWitt') applyWdwParams(urlState, ext)
     if (effectiveQuantumMode === 'antiDeSitter') applyAdsParams(urlState, ext)
-    if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
-    if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
-    if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
-    if (effectiveQuantumMode === 'bifurcationHorizon') applyBifurcationHorizonParams(urlState, ext)
-    if (effectiveQuantumMode === 'modularKnot') applyModularKnotParams(urlState, ext)
+    applySpectralHorizonParams(effectiveQuantumMode, urlState, ext)
     if (isWdwZetaMode(effectiveQuantumMode)) applyWdwZetaParamsKeepingDimension(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)

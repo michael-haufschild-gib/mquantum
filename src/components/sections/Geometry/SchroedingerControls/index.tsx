@@ -28,6 +28,7 @@ import { HilbertPolyaControls } from './HilbertPolyaControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { KKCompactificationSection } from './KKCompactificationSection'
+import { ModularHorizonControls } from './ModularHorizonControls'
 import { ModularKnotControls } from './ModularKnotControls'
 import { QuantumWalkControls } from './QuantumWalkControls'
 import { RiemannZetaControls } from './RiemannZetaControls'
@@ -90,6 +91,8 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       return <HilbertPolyaControls />
     case 'bifurcationHorizon':
       return <BifurcationHorizonControls />
+    case 'modularHorizon':
+      return <ModularHorizonControls />
     case 'modularKnot':
       return <ModularKnotControls />
     case 'wheelerDeWitt':
@@ -179,11 +182,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         dimension,
         representation: config.representation,
       })
-    const renderingModeLabel = effectiveIsoEnabled
-      ? dimension === 2
-        ? 'Isolines'
-        : 'Isosurface (Marching Cubes)'
-      : 'Volumetric (Beer-Lambert)'
     const isHydrogenNDMode = mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
     const isFreeScalarField = mode === 'freeScalarField'
     const isTdseDynamics = mode === 'tdseDynamics'
@@ -218,6 +216,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isHilbertPolya &&
           !isBifurcationHorizon &&
           !isModularKnot &&
+          mode !== 'modularHorizon' &&
           !isWdwZeta && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
@@ -325,7 +324,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
         {/* Render Mode Info */}
         <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
-          <p>Rendering: {renderingModeLabel}</p>
+          <p>Rendering: {renderingModeLabel(mode, effectiveIsoEnabled, dimension)}</p>
           {isHydrogenNDMode && (
             <p className="text-text-tertiary mt-1">{dimension}D hydrogen atom viewed in 3D space</p>
           )}
@@ -373,3 +372,9 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 )
 
 SchroedingerControls.displayName = 'SchroedingerControls'
+
+function renderingModeLabel(mode: string, effectiveIsoEnabled: boolean, dimension: number): string {
+  if (mode === 'modularHorizon') return dimension === 2 ? 'Poincaré disk' : 'AdS₄ exterior volume'
+  if (!effectiveIsoEnabled) return 'Volumetric (Beer-Lambert)'
+  return dimension === 2 ? 'Isolines' : 'Isosurface (Marching Cubes)'
+}

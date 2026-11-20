@@ -111,7 +111,14 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
       const { isPlaying, animatingPlanes, getRotationDelta, updateAccumulatedTime } = animationState
 
       if (isPlaying && deltaTimeMs > 0 && deltaTimeMs < 100) {
-        updateAccumulatedTime(deltaTime)
+        updateAccumulatedTime(
+          deltaTime,
+          objectType === 'schroedinger' &&
+            animationState.direction < 0 &&
+            useExtendedObjectStore.getState().schroedinger.quantumMode === 'modularHorizon'
+            ? 0
+            : undefined
+        )
 
         if (animatingPlanes.size > 0) {
           const rotationState = useRotationStore.getState()
